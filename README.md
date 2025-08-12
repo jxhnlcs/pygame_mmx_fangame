@@ -1,5 +1,5 @@
 
-# Mega Man X (Pygame) – Run Test
+# Mega Man X (Pygame) – Fan Game
 
 **Controles:** A/D ou ←/→ para correr, ESC para sair.
 
