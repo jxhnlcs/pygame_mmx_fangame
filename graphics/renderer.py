@@ -15,6 +15,32 @@ class GameRenderer:
         """Limpa a tela com a cor de fundo."""
         self.screen.fill(BACKGROUND_COLOR)
 
+    def draw_background(self, background_img, camera_x):
+        """Desenha o background com efeito parallax."""
+        if background_img is None:
+            return
+            
+        bg_width = background_img.get_width()
+        bg_height = background_img.get_height()
+        
+        # Calcula a velocidade do parallax (background se move mais lento que a câmera)
+        parallax_speed = 0.5
+        bg_offset = int(camera_x * parallax_speed) % bg_width
+        
+        # Desenha o background repetindo horizontalmente
+        # Primeiro segmento
+        self.screen.blit(background_img, (-bg_offset, 0))
+        
+        # Segundo segmento (para continuidade)
+        if bg_offset > 0:
+            self.screen.blit(background_img, (bg_width - bg_offset, 0))
+        
+        # Se a tela é maior que o background, desenha mais segmentos
+        x_pos = bg_width - bg_offset
+        while x_pos < WINDOW_WIDTH:
+            self.screen.blit(background_img, (x_pos, 0))
+            x_pos += bg_width
+
     def draw_ground(self, camera_x):
         """Desenha a plataforma e o chão."""
         # Plataforma principal

@@ -34,6 +34,18 @@ class Game:
         sheet_path = Path(__file__).parent.parent / "assets" / "mmx_xsheet.png"
         self.sprite_sheet = pygame.image.load(str(sheet_path)).convert()
         self.sprite_sheet.set_colorkey(MAGENTA_COLORKEY)
+        
+        # Carrega background
+        try:
+            bg_path = Path(__file__).parent.parent / "assets" / "background.png"
+            if bg_path.exists():
+                self.background = pygame.image.load(str(bg_path)).convert()
+            else:
+                self.background = None
+                print("[Background] Arquivo background.png não encontrado")
+        except Exception as e:
+            self.background = None
+            print(f"[Background] Erro ao carregar background: {e}")
 
     def _create_entities(self):
         """Cria as entidades do jogo."""
@@ -96,6 +108,7 @@ class Game:
     def render(self):
         """Renderiza todos os elementos do jogo."""
         self.renderer.clear_screen()
+        self.renderer.draw_background(self.background, self.camera.get_x())
         self.renderer.draw_ground(self.camera.get_x())
         self.renderer.draw_player(self.player)
         self.renderer.draw_projectiles(self.projectiles)
