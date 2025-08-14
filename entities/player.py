@@ -8,18 +8,22 @@ from entities.projectile import Pellet
 class Player(pygame.sprite.Sprite):
     """Jogador principal - Mega Man X."""
     
-    def __init__(self, sprite_sheet, animation_rects):
+    def __init__(self, sprite_sheet, animation_rects, buster_sheet, buster_rects):
         super().__init__()
-        self._load_animations(sprite_sheet, animation_rects)
+        self._load_animations(sprite_sheet, animation_rects, buster_sheet, buster_rects)
         self._init_sprite()
         self._init_physics()
         self._init_animation_state()
         self._init_timers()
+        self._init_input_state()
         
         # Referência para grupo de projéteis (será definida externamente)
         self.projectiles = None
+        
+        # Som de disparo (será definido externamente)
+        self.shoot_sound = None
 
-    def _load_animations(self, sprite_sheet, animation_rects):
+    def _load_animations(self, sprite_sheet, animation_rects, buster_sheet, buster_rects):
         """Carrega todas as animações do jogador."""
         # Animação de corrida
         run_frames = slice_surface_padded(
@@ -49,14 +53,22 @@ class Player(pygame.sprite.Sprite):
         self.shoot_right = scale_frames(shoot_frames, SPRITE_SCALE)
         self.shoot_left = flip_frames_horizontal(self.shoot_right)
 
-        # Projétil
+        # Projétil (do buster sheet)
         pellet_frames = slice_surface_padded(
-            sprite_sheet, [animation_rects['pellet']], pad=(0, 0, 0, 0)
+            buster_sheet, [buster_rects['pellet']], pad=(0, 0, 0, 0)
         )
         self.pellet_image = scale_frames(pellet_frames, SPRITE_SCALE)[0]
 
-        # Frame parado (usando primeiro frame da corrida)
-        self.idle_image = self.run_right[0]
+        # Frame parado (sprite específico para idle)
+        if 'idle' in animation_rects:
+            idle_frames = slice_surface_padded(
+                sprite_sheet, [animation_rects['idle']], pad=(0, 1, 0, 1)
+            )
+            idle_scaled = scale_frames(idle_frames, SPRITE_SCALE)
+            self.idle_image = idle_scaled[0]
+        else:
+            # Fallback: usar primeiro frame da corrida
+            self.idle_image = self.run_right[0]
 
     def _init_sprite(self):
         """Inicializa o sprite."""
@@ -86,6 +98,14 @@ class Player(pygame.sprite.Sprite):
         self.shoot_timer = 0
         self.shoot_cooldown = 0
 
+    def _init_input_state(self):
+        """Inicializa estado das teclas para detectar pressionamentos únicos."""
+        self.keys_pressed = {
+            'dash': False,
+            'jump': False,
+            'shoot': False
+        }
+
     def start_dash(self):
         """Inicia o dash se possível."""
         if self.is_on_ground and self.dash_timer <= 0:
@@ -97,13 +117,21 @@ class Player(pygame.sprite.Sprite):
         if self.shoot_cooldown > 0:
             return
             
-        self.shoot_timer = SHOOT_COOLDOWN_MS
-        self.shoot_cooldown = SHOOT_COOLDOWN_MS
+        # Toca som de disparo
+        if self.shoot_sound:
+            self.shoot_sound.play()
         
-        # Calcula posição do projétil (à frente do braço)
-        offset = 16 * SPRITE_SCALE
-        world_px = self.world_x + (offset if self.facing_direction == 1 else -offset)
-        screen_py = self.rect.centery - 6 * SPRITE_SCALE
+        # Reduzido o cooldown para tiros mais rápidos
+        self.shoot_timer = 150
+        self.shoot_cooldown = 150
+        
+        # Calcula posição do projétil (à frente do braço estendido)
+        offset_x = 15 * SPRITE_SCALE
+        world_px = self.world_x + (offset_x if self.facing_direction == 1 else -offset_x)
+        
+        # Ajusta altura para o braço estendido
+        arm_height_offset = -2 * SPRITE_SCALE
+        screen_py = self.rect.centery + arm_height_offset
         
         pellet = Pellet(self.pellet_image, world_px, screen_py, self.facing_direction)
         
@@ -112,34 +140,40 @@ class Player(pygame.sprite.Sprite):
 
     def handle_input(self, keys):
         """Processa entrada do jogador."""
-        # Movimento horizontal
+        # Movimento horizontal (apenas setas direcionais)
         self.velocity_x = 0
         
-        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
+        if keys[pygame.K_LEFT]:
             self.velocity_x -= self.speed
             self.facing_direction = -1
             
-        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+        if keys[pygame.K_RIGHT]:
             self.velocity_x += self.speed
             self.facing_direction = 1
 
-        # Pulo
-        jump_keys = [pygame.K_SPACE, pygame.K_w, pygame.K_UP]
-        if any(keys[key] for key in jump_keys) and self.is_on_ground:
+        # Pulo (Z) - apenas um pressionamento por vez
+        if keys[pygame.K_z] and not self.keys_pressed['jump'] and self.is_on_ground:
             self.velocity_y = JUMP_VELOCITY
             self.is_on_ground = False
             self.jump_index = 0
             self.jump_timer = 0
+            self.keys_pressed['jump'] = True
+        elif not keys[pygame.K_z]:
+            self.keys_pressed['jump'] = False
 
-        # Dash
-        dash_keys = [pygame.K_LSHIFT, pygame.K_x]
-        if any(keys[key] for key in dash_keys):
+        # Dash (X) - apenas um pressionamento por vez
+        if keys[pygame.K_x] and not self.keys_pressed['dash']:
             self.start_dash()
+            self.keys_pressed['dash'] = True
+        elif not keys[pygame.K_x]:
+            self.keys_pressed['dash'] = False
 
-        # Tiro
-        shoot_keys = [pygame.K_j, pygame.K_z]
-        if any(keys[key] for key in shoot_keys):
+        # Tiro (A) - apenas um pressionamento por vez
+        if keys[pygame.K_a] and not self.keys_pressed['shoot']:
             self.shoot()
+            self.keys_pressed['shoot'] = True
+        elif not keys[pygame.K_a]:
+            self.keys_pressed['shoot'] = False
 
     def apply_physics(self, dt):
         """Aplica física ao jogador."""

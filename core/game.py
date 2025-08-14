@@ -30,10 +30,17 @@ class Game:
 
     def _load_assets(self):
         """Carrega todos os recursos do jogo."""
-        # Carrega sprite sheet
-        sheet_path = Path(__file__).parent.parent / "assets" / "mmx_xsheet.png"
+        # Carrega sprite sheet principal
+        sheet_path = Path(__file__).parent.parent / "assets" / "spritesheets" / "mmx_xsheet.png"
         self.sprite_sheet = pygame.image.load(str(sheet_path)).convert()
         self.sprite_sheet.set_colorkey(MAGENTA_COLORKEY)
+        
+        # Carrega sprite sheet do buster
+        buster_path = Path(__file__).parent.parent / "assets" / "spritesheets" / "mmx1-buster.png"
+        self.buster_sheet = pygame.image.load(str(buster_path)).convert_alpha()
+        
+        # Carrega efeitos sonoros
+        self._load_sound_effects()
         
         # Carrega background
         try:
@@ -46,6 +53,28 @@ class Game:
         except Exception as e:
             self.background = None
             print(f"[Background] Erro ao carregar background: {e}")
+
+    def _load_sound_effects(self):
+        """Carrega todos os efeitos sonoros."""
+        try:
+            pygame.mixer.init()
+            
+            # Carrega som de disparo
+            shoot_sound_path = Path(__file__).parent.parent / "assets" / "sound-effects" / "shoots"
+            
+            # Procura por arquivos de áudio na pasta shoots
+            sound_files = list(shoot_sound_path.glob("*.wav")) + list(shoot_sound_path.glob("*.mp3"))
+            
+            if sound_files:
+                self.shoot_sound = pygame.mixer.Sound(str(sound_files[0]))
+                print(f"[SFX] Som de disparo carregado: {sound_files[0].name}")
+            else:
+                self.shoot_sound = None
+                print("[SFX] Nenhum arquivo de som encontrado na pasta shoots")
+                
+        except Exception as e:
+            self.shoot_sound = None
+            print(f"[SFX] Erro ao carregar efeitos sonoros: {e}")
 
     def _create_entities(self):
         """Cria as entidades do jogo."""
@@ -60,11 +89,19 @@ class Game:
                     (331, 62, 24, 38), (356, 68, 30, 32)],
             'dash': [(282, 157, 33, 35), (317, 161, 41, 27), (317, 161, 41, 27)],
             'shoot': [(133, 66, 30, 34), (168, 66, 29, 34)],
-            'pellet': (112, 73, 14, 3)
+            'idle': (321, 15, 36, 36)
+        }
+        
+        # Define coordenadas do projétil no buster sheet
+        buster_rects = {
+            'pellet': (61, 3, 10, 8)
         }
 
         # Cria o jogador
-        self.player = Player(self.sprite_sheet, animation_rects)
+        self.player = Player(self.sprite_sheet, animation_rects, self.buster_sheet, buster_rects)
+        
+        # Define som de disparo para o jogador
+        self.player.shoot_sound = getattr(self, 'shoot_sound', None)
         
         # Grupo de projéteis
         self.projectiles = pygame.sprite.Group()
@@ -73,7 +110,7 @@ class Game:
     def _setup_audio(self):
         """Configura o áudio do jogo."""
         try:
-            bgm_path = Path(__file__).parent.parent / 'assets' / 'bgm.mp3'
+            bgm_path = Path(__file__).parent.parent / 'assets' / 'bgm' / 'bgm.mp3'
             if bgm_path.exists():
                 pygame.mixer.init()
                 pygame.mixer.music.load(str(bgm_path))

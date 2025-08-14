@@ -1,7 +1,11 @@
-
 # Mega Man X (Pygame) – Fan Game
 
-**Controles:** A/D ou ←/→ para correr, ESC para sair.
+**Controles:** 
+- ←/→ para correr
+- Z para pular
+- X para dash 
+- A para atirar
+- ESC para sair
 
 ## Como rodar
 1. Crie um ambiente e instale o pygame:
@@ -26,6 +30,7 @@
 - **Background com Parallax**: Coloque uma imagem PNG na pasta `assets/background.png` e ela será exibida com efeito de profundidade
 - **Animações suaves**: Os frames de corrida foram recortados automaticamente da **3ª linha** da spritesheet
 - **Controles responsivos**: Movimento, pulo, dash e tiro implementados
+- **Sistema de input único**: Dash, pulo e tiro respondem apenas a pressionamentos únicos (não segurar)
 
 Os frames de corrida estão definidos na lista `run_rects` dentro do código.
 Você pode ajustar `SCALE`, `SPEED` e o `GROUND_Y` nas configurações conforme necessário.
