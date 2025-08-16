@@ -66,9 +66,11 @@ class Player(pygame.sprite.Sprite):
             )
             idle_scaled = scale_frames(idle_frames, SPRITE_SCALE)
             self.idle_image = idle_scaled[0]
+            self.idle_image_left = pygame.transform.flip(self.idle_image, True, False)
         else:
             # Fallback: usar primeiro frame da corrida
             self.idle_image = self.run_right[0]
+            self.idle_image_left = self.run_left[0]
 
     def _init_sprite(self):
         """Inicializa o sprite."""
@@ -265,7 +267,7 @@ class Player(pygame.sprite.Sprite):
         else:
             # Parado
             self.animation_index = 0
-            image = self.idle_image if self.facing_direction == 1 else self.run_left[0]
+            image = self.idle_image if self.facing_direction == 1 else self.idle_image_left
 
         # Se estiver atirando no chão, substitui pela pose de tiro
         if self.shoot_timer > 0:
