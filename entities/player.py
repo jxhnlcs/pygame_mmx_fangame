@@ -1,4 +1,4 @@
-"""Classe do jogador (Mega Man X)"""
+"""Classe do jogador (Mega Man X) com dash melhorado"""
 import pygame
 from config.settings import *
 from utils.sprite_utils import *
@@ -97,6 +97,7 @@ class Player(pygame.sprite.Sprite):
     def _init_timers(self):
         """Inicializa timers de ações."""
         self.dash_timer = 0
+        self.dash_velocity = 0  # Nova variável para velocidade do dash
         self.shoot_timer = 0
         self.shoot_cooldown = 0
 
@@ -112,7 +113,9 @@ class Player(pygame.sprite.Sprite):
         """Inicia o dash se possível."""
         if self.is_on_ground and self.dash_timer <= 0:
             self.dash_timer = DASH_TIME_MS
-            self.speed = DASH_SPEED
+            # Define velocidade do dash na direção que está olhando
+            self.dash_velocity = DASH_SPEED * self.facing_direction
+            print(f"[DEBUG] Dash iniciado! Direção: {self.facing_direction}, Velocidade: {self.dash_velocity}")
 
     def shoot(self):
         """Dispara um projétil se possível."""
@@ -145,13 +148,18 @@ class Player(pygame.sprite.Sprite):
         # Movimento horizontal (apenas setas direcionais)
         self.velocity_x = 0
         
-        if keys[pygame.K_LEFT]:
-            self.velocity_x -= self.speed
-            self.facing_direction = -1
-            
-        if keys[pygame.K_RIGHT]:
-            self.velocity_x += self.speed
-            self.facing_direction = 1
+        # Se não estiver em dash, processa movimento normal
+        if self.dash_timer <= 0:
+            if keys[pygame.K_LEFT]:
+                self.velocity_x -= self.speed
+                self.facing_direction = -1
+                
+            if keys[pygame.K_RIGHT]:
+                self.velocity_x += self.speed
+                self.facing_direction = 1
+        else:
+            # Durante o dash, usa a velocidade do dash
+            self.velocity_x = self.dash_velocity
 
         # Pulo (Z) - apenas um pressionamento por vez
         if keys[pygame.K_z] and not self.keys_pressed['jump'] and self.is_on_ground:
@@ -198,7 +206,9 @@ class Player(pygame.sprite.Sprite):
         if self.dash_timer > 0:
             self.dash_timer -= dt
             if self.dash_timer <= 0:
-                self.speed = RUN_SPEED  # Fim do dash
+                # Fim do dash - para a velocidade do dash
+                self.dash_velocity = 0
+                print("[DEBUG] Dash terminou!")
 
         if self.shoot_timer > 0:
             self.shoot_timer -= dt
@@ -208,6 +218,7 @@ class Player(pygame.sprite.Sprite):
 
     def animate(self, dt):
         """Atualiza animação do jogador."""
+        # Verifica se está se movendo (considera também dash)
         is_moving = abs(self.velocity_x) > 0.1
 
         # Animação de dash (prioridade máxima no chão)

@@ -1,12 +1,6 @@
-"""Ponto de entrada do jogo"""
+"""Arquivo principal do jogo Mega Man X Runner Demo"""
 from core.game import Game
 
-
-def main():
-    """Função principal."""
+if __name__ == "__main__":
     game = Game()
     game.run()
-
-
-if __name__ == "__main__":
-    main()

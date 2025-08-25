@@ -1,4 +1,4 @@
-"""Classe principal do jogo"""
+"""Classe principal do jogo com sistema de estados"""
 import pygame
 import sys
 from pathlib import Path
@@ -7,10 +7,11 @@ from config.settings import *
 from entities.player import Player
 from graphics.camera import Camera
 from graphics.renderer import GameRenderer
+from core.game_states import StateManager, GameState, MenuScreen, PauseScreen, GameOverScreen
 
 
 class Game:
-    """Classe principal que gerencia o jogo."""
+    """Classe principal que gerencia o jogo com sistema de estados."""
     
     def __init__(self):
         pygame.init()
@@ -18,15 +19,41 @@ class Game:
         pygame.display.set_caption(WINDOW_TITLE)
         self.clock = pygame.time.Clock()
         
-        self.camera = Camera()
-        self.renderer = GameRenderer(self.screen)
+        # Sistema de estados
+        self.state_manager = StateManager()
+        self.menu_screen = MenuScreen(self.screen)
+        self.pause_screen = PauseScreen(self.screen)
+        self.game_over_screen = GameOverScreen(self.screen)
         
-        self._load_assets()
-        self._create_entities()
-        self._setup_audio()
+        # Sistema de detecção de teclas pressionadas
+        self.previous_keys = pygame.key.get_pressed()
+        self.key_pressed = {}
         
+        # Variáveis de jogo
         self.distance = 0.0
+        self.start_time = 0
+        self.total_time = 0
         self.running = True
+        self.game_surface = None  # Para capturar o jogo para o pause
+        
+        # Inicialização dos componentes do jogo (será feita quando começar)
+        self.camera = None
+        self.renderer = None
+        self.player = None
+        self.projectiles = None
+        self.sprite_sheet = None
+        self.buster_sheet = None
+        self.background = None
+        self.shoot_sound = None
+
+    def _initialize_game_components(self):
+        """Inicializa os componentes do jogo quando necessário."""
+        if self.camera is None:
+            self.camera = Camera()
+            self.renderer = GameRenderer(self.screen)
+            self._load_assets()
+            self._create_entities()
+            self._setup_audio()
 
     def _load_assets(self):
         """Carrega todos os recursos do jogo."""
@@ -118,14 +145,88 @@ class Game:
         except Exception as e:
             print(f'[BGM] Falha ao carregar bgm.mp3: {e}')
 
+    def _reset_game(self):
+        """Reinicia o jogo."""
+        self.distance = 0.0
+        self.start_time = pygame.time.get_ticks()
+        self.total_time = 0
+        
+        if self.player:
+            # Reinicializa o jogador
+            self.player.world_x = 0.0
+            self.player.velocity_x = 0.0
+            self.player.velocity_y = 0.0
+            self.player.rect.midbottom = (WINDOW_WIDTH // 2, GROUND_Y)
+            self.player.is_on_ground = True
+            self.player.facing_direction = 1
+            
+        if self.camera:
+            self.camera.x = 0.0
+            
+        if self.projectiles:
+            self.projectiles.empty()
+
+    def _update_input_detection(self):
+        """Atualiza sistema de detecção de teclas pressionadas."""
+        current_keys = pygame.key.get_pressed()
+        
+        # Detecta teclas que foram pressionadas neste frame
+        self.key_pressed = {}
+        
+        # Lista das teclas que queremos monitorar
+        keys_to_monitor = [
+            pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT,
+            pygame.K_RETURN, pygame.K_ESCAPE, pygame.K_z, pygame.K_x, pygame.K_a
+        ]
+        
+        for key in keys_to_monitor:
+            self.key_pressed[key] = current_keys[key] and not self.previous_keys[key]
+        
+        # Debug das teclas de seta
+        if self.key_pressed.get(pygame.K_UP, False):
+            print("[DEBUG] Tecla UP detectada!")
+        if self.key_pressed.get(pygame.K_DOWN, False):
+            print("[DEBUG] Tecla DOWN detectada!")
+        if self.key_pressed.get(pygame.K_RETURN, False):
+            print("[DEBUG] Tecla ENTER detectada!")
+        
+        self.previous_keys = current_keys
+
+    def _check_game_over_conditions(self):
+        """Verifica condições de game over."""
+        if self.player:
+            # Game over se cair muito abaixo do chão
+            if self.player.rect.top > WINDOW_HEIGHT + 100:
+                return True
+        return False
+
     def handle_events(self):
         """Processa os eventos do jogo."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
 
-    def update(self, dt, keys):
-        """Atualiza todos os elementos do jogo."""
+    def handle_menu_state(self, keys):
+        """Gerencia o estado do menu."""
+        action = self.menu_screen.handle_input(keys, self.key_pressed)
+        
+        if action == "start_game":
+            self._initialize_game_components()
+            self._reset_game()
+            self.start_time = pygame.time.get_ticks()
+            self.state_manager.change_state(GameState.PLAYING)
+        elif action == "quit":
+            self.running = False
+
+    def handle_playing_state(self, dt, keys):
+        """Gerencia o estado de jogo."""
+        # Verifica pause
+        if self.key_pressed.get(pygame.K_ESCAPE, False):
+            # Captura a tela atual para o pause
+            self.game_surface = self.screen.copy()
+            self.state_manager.change_state(GameState.PAUSED)
+            return
+        
         # Atualiza jogador
         self.player.update(dt, keys)
         
@@ -135,21 +236,70 @@ class Game:
         # Atualiza projéteis
         self.projectiles.update(dt, self.camera.get_x())
         
-        # Atualiza distância
+        # Atualiza distância e tempo
         self.distance = self.player.world_x
+        self.total_time = pygame.time.get_ticks() - self.start_time
         
-        # Verifica se deve sair
-        if keys[pygame.K_ESCAPE]:
-            self.running = False
+        # Verifica game over
+        if self._check_game_over_conditions():
+            self.game_over_screen.set_stats(self.distance, self.total_time)
+            self.state_manager.change_state(GameState.GAME_OVER)
+
+    def handle_paused_state(self, keys):
+        """Gerencia o estado de pause."""
+        action = self.pause_screen.handle_input(keys, self.key_pressed)
+        
+        if action == "resume":
+            self.state_manager.change_state(GameState.PLAYING)
+        elif action == "restart":
+            self._reset_game()
+            self.start_time = pygame.time.get_ticks()
+            self.state_manager.change_state(GameState.PLAYING)
+        elif action == "menu":
+            self.state_manager.change_state(GameState.MENU)
+
+    def handle_game_over_state(self, keys):
+        """Gerencia o estado de game over."""
+        action = self.game_over_screen.handle_input(keys, self.key_pressed)
+        
+        if action == "restart":
+            self._reset_game()
+            self.start_time = pygame.time.get_ticks()
+            self.state_manager.change_state(GameState.PLAYING)
+        elif action == "menu":
+            self.state_manager.change_state(GameState.MENU)
+
+    def update(self, dt, keys):
+        """Atualiza o jogo baseado no estado atual."""
+        current_state = self.state_manager.get_current_state()
+        
+        if current_state == GameState.MENU:
+            self.handle_menu_state(keys)
+        elif current_state == GameState.PLAYING:
+            self.handle_playing_state(dt, keys)
+        elif current_state == GameState.PAUSED:
+            self.handle_paused_state(keys)
+        elif current_state == GameState.GAME_OVER:
+            self.handle_game_over_state(keys)
 
     def render(self):
-        """Renderiza todos os elementos do jogo."""
-        self.renderer.clear_screen()
-        self.renderer.draw_background(self.background, self.camera.get_x())
-        self.renderer.draw_ground(self.camera.get_x())
-        self.renderer.draw_player(self.player)
-        self.renderer.draw_projectiles(self.projectiles)
-        self.renderer.draw_hud(self.distance)
+        """Renderiza baseado no estado atual."""
+        current_state = self.state_manager.get_current_state()
+        
+        if current_state == GameState.MENU:
+            self.menu_screen.render()
+        elif current_state == GameState.PLAYING:
+            # Renderização normal do jogo
+            self.renderer.clear_screen()
+            self.renderer.draw_background(self.background, self.camera.get_x())
+            self.renderer.draw_ground(self.camera.get_x())
+            self.renderer.draw_player(self.player)
+            self.renderer.draw_projectiles(self.projectiles)
+            self.renderer.draw_hud(self.distance)
+        elif current_state == GameState.PAUSED:
+            self.pause_screen.render(self.game_surface)
+        elif current_state == GameState.GAME_OVER:
+            self.game_over_screen.render()
         
         pygame.display.flip()
 
@@ -157,6 +307,8 @@ class Game:
         """Loop principal do jogo."""
         while self.running:
             dt = self.clock.tick(FPS)
+            
+            self._update_input_detection()
             keys = pygame.key.get_pressed()
             
             self.handle_events()

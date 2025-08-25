@@ -1,4 +1,4 @@
-"""Sistema de renderização"""
+"""Sistema de renderização atualizado"""
 import pygame
 from config.settings import *
 
@@ -64,9 +64,9 @@ class GameRenderer:
                            (x, GROUND_Y + 16, stripe_width // 3, 6))
 
     def draw_hud(self, distance):
-        """Desenha a interface do usuário."""
-        # Controles
-        controls_text = "←/→ correr | ESPAÇO pular | SHIFT/X dash | J/Z atirar | ESC sair"
+        """Desenha a interface do usuário durante o jogo."""
+        # Controles atualizados
+        controls_text = "←/→ correr | Z pular | X dash | A atirar | ESC pause"
         controls_surface = self.font.render(controls_text, True, UI_TEXT_COLOR)
         self.screen.blit(controls_surface, (16, 12))
 
