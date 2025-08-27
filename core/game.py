@@ -1,4 +1,4 @@
-"""Classe principal do jogo com sistema de estados"""
+"""Classe principal do jogo com sistema de inimigos"""
 import pygame
 import sys
 from pathlib import Path
@@ -8,10 +8,11 @@ from entities.player import Player
 from graphics.camera import Camera
 from graphics.renderer import GameRenderer
 from core.game_states import StateManager, GameState, MenuScreen, PauseScreen, GameOverScreen
+from entities.enemies import EnemyManager
 
 
 class Game:
-    """Classe principal que gerencia o jogo com sistema de estados."""
+    """Classe principal que gerencia o jogo com sistema de estados e inimigos."""
     
     def __init__(self):
         pygame.init()
@@ -34,15 +35,18 @@ class Game:
         self.start_time = 0
         self.total_time = 0
         self.running = True
-        self.game_surface = None  # Para capturar o jogo para o pause
+        self.game_surface = None
         
-        # Inicialização dos componentes do jogo (será feita quando começar)
+        # Inicialização dos componentes do jogo
         self.camera = None
         self.renderer = None
         self.player = None
         self.projectiles = None
+        self.enemy_manager = None
         self.sprite_sheet = None
         self.buster_sheet = None
+        self.enemy_sheet = None
+        self.enemy_projectile_image = None
         self.background = None
         self.shoot_sound = None
 
@@ -54,10 +58,13 @@ class Game:
             self._load_assets()
             self._create_entities()
             self._setup_audio()
+            
+            # Inicializa sistema de inimigos
+            self.enemy_manager = EnemyManager(self.enemy_sheet, self.enemy_projectile_image)
 
     def _load_assets(self):
         """Carrega todos os recursos do jogo."""
-        # Carrega sprite sheet principal
+        # Carrega sprite sheet principal do jogador
         sheet_path = Path(__file__).parent.parent / "assets" / "spritesheets" / "mmx_xsheet.png"
         self.sprite_sheet = pygame.image.load(str(sheet_path)).convert()
         self.sprite_sheet.set_colorkey(MAGENTA_COLORKEY)
@@ -65,6 +72,9 @@ class Game:
         # Carrega sprite sheet do buster
         buster_path = Path(__file__).parent.parent / "assets" / "spritesheets" / "mmx1-buster.png"
         self.buster_sheet = pygame.image.load(str(buster_path)).convert_alpha()
+        
+        # Carrega sprite sheet do inimigo
+        self._load_enemy_assets()
         
         # Carrega efeitos sonoros
         self._load_sound_effects()
@@ -80,6 +90,57 @@ class Game:
         except Exception as e:
             self.background = None
             print(f"[Background] Erro ao carregar background: {e}")
+
+    def _load_enemy_assets(self):
+        """Carrega assets dos inimigos."""
+        try:
+            # Tente carregar sprite sheet do inimigo
+            # Adapte o caminho para onde você salvou a sprite sheet
+            enemy_path = Path(__file__).parent.parent / "assets" / "spritesheets" / "enemy_sheet.png"
+            
+            if enemy_path.exists():
+                self.enemy_sheet = pygame.image.load(str(enemy_path)).convert()
+                self.enemy_sheet.set_colorkey(MAGENTA_COLORKEY)
+                print("[Assets] Enemy sprite sheet carregada")
+            else:
+                # Se não encontrar, cria uma sprite temporária
+                self.enemy_sheet = self._create_temp_enemy_sprite()
+                print("[Assets] Usando sprite temporária do inimigo")
+            
+            # Carrega projétil do inimigo
+            self.enemy_projectile_image = self._create_enemy_projectile_image()
+            
+        except Exception as e:
+            print(f"[Assets] Erro ao carregar assets do inimigo: {e}")
+            self.enemy_sheet = self._create_temp_enemy_sprite()
+            self.enemy_projectile_image = self._create_enemy_projectile_image()
+
+    def _create_temp_enemy_sprite(self):
+        """Cria uma sprite temporária para o inimigo."""
+        # Cria uma sprite sheet temporária com 7 frames
+        sheet = pygame.Surface((224, 32))  # 7 frames de 32x32
+        sheet.fill(MAGENTA_COLORKEY)
+        sheet.set_colorkey(MAGENTA_COLORKEY)
+        
+        # Desenha frames temporários
+        for i in range(7):
+            x = i * 32
+            # Frame azul com variações
+            color = (100 + i * 20, 100 + i * 10, 200)
+            pygame.draw.circle(sheet, color, (x + 16, 16), 12)
+            pygame.draw.rect(sheet, (80, 80, 180), (x + 8, 20, 16, 8))
+        
+        return sheet
+
+    def _create_enemy_projectile_image(self):
+        """Cria imagem do projétil inimigo."""
+        # Cria um projétil temporário (círculo laranja)
+        projectile = pygame.Surface((12, 12))
+        projectile.fill(MAGENTA_COLORKEY)
+        projectile.set_colorkey(MAGENTA_COLORKEY)
+        pygame.draw.circle(projectile, (255, 150, 50), (6, 6), 5)
+        pygame.draw.circle(projectile, (255, 200, 100), (6, 6), 3)
+        return pygame.transform.scale(projectile, (12 * 2, 12 * 2))  # Escala
 
     def _load_sound_effects(self):
         """Carrega todos os efeitos sonoros."""
@@ -105,7 +166,7 @@ class Game:
 
     def _create_entities(self):
         """Cria as entidades do jogo."""
-        # Define os retângulos das animações
+        # Define os retângulos das animações do jogador
         animation_rects = {
             'run': [(106, 108, 30, 33), (137, 108, 20, 33), (158, 108, 23, 33), 
                    (181, 108, 32, 33), (213, 108, 34, 33), (247, 108, 26, 33), 
@@ -130,7 +191,7 @@ class Game:
         # Define som de disparo para o jogador
         self.player.shoot_sound = getattr(self, 'shoot_sound', None)
         
-        # Grupo de projéteis
+        # Grupo de projéteis do jogador
         self.projectiles = pygame.sprite.Group()
         self.player.projectiles = self.projectiles
 
@@ -165,6 +226,10 @@ class Game:
             
         if self.projectiles:
             self.projectiles.empty()
+            
+        if self.enemy_manager:
+            # Reinicializa os inimigos
+            self.enemy_manager = EnemyManager(self.enemy_sheet, self.enemy_projectile_image)
 
     def _update_input_detection(self):
         """Atualiza sistema de detecção de teclas pressionadas."""
@@ -182,19 +247,16 @@ class Game:
         for key in keys_to_monitor:
             self.key_pressed[key] = current_keys[key] and not self.previous_keys[key]
         
-        # Debug das teclas de seta
-        if self.key_pressed.get(pygame.K_UP, False):
-            print("[DEBUG] Tecla UP detectada!")
-        if self.key_pressed.get(pygame.K_DOWN, False):
-            print("[DEBUG] Tecla DOWN detectada!")
-        if self.key_pressed.get(pygame.K_RETURN, False):
-            print("[DEBUG] Tecla ENTER detectada!")
-        
         self.previous_keys = current_keys
 
     def _check_game_over_conditions(self):
         """Verifica condições de game over."""
-        if self.player:
+        if self.player and self.enemy_manager:
+            # Game over se foi atingido por projétil inimigo
+            if self.enemy_manager.check_enemy_projectile_collision(self.player.rect):
+                print("[Game] Jogador atingido por projétil inimigo!")
+                return True
+                
             # Game over se cair muito abaixo do chão
             if self.player.rect.top > WINDOW_HEIGHT + 100:
                 return True
@@ -233,8 +295,12 @@ class Game:
         # Atualiza câmera
         self.camera.update(self.player)
         
-        # Atualiza projéteis
+        # Atualiza projéteis do jogador
         self.projectiles.update(dt, self.camera.get_x())
+        
+        # Atualiza inimigos
+        self.enemy_manager.update(dt, self.player.world_x, self.player.rect.centery, 
+                                 self.camera.get_x(), self.projectiles)
         
         # Atualiza distância e tempo
         self.distance = self.player.world_x
@@ -293,9 +359,15 @@ class Game:
             self.renderer.clear_screen()
             self.renderer.draw_background(self.background, self.camera.get_x())
             self.renderer.draw_ground(self.camera.get_x())
+            
+            # Desenha inimigos
+            self.enemy_manager.render(self.screen, self.camera.get_x())
+            
+            # Desenha jogador e projéteis
             self.renderer.draw_player(self.player)
             self.renderer.draw_projectiles(self.projectiles)
             self.renderer.draw_hud(self.distance)
+            
         elif current_state == GameState.PAUSED:
             self.pause_screen.render(self.game_surface)
         elif current_state == GameState.GAME_OVER:

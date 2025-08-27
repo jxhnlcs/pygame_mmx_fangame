@@ -196,11 +196,15 @@ class Player(pygame.sprite.Sprite):
         self.velocity_y += GRAVITY
         self.rect.y += int(self.velocity_y)
 
-        # Colisão com o chão
-        if self.rect.bottom >= GROUND_Y:
+        # Colisão com o chão (será verificada pelo obstacle manager)
+        if self.rect.bottom >= GROUND_Y and self.velocity_y >= 0:
             self.rect.bottom = GROUND_Y
             self.velocity_y = 0
             self.is_on_ground = True
+        else:
+            # Se não está no chão, não está no chão
+            if self.rect.bottom < GROUND_Y:
+                self.is_on_ground = False
 
         # Atualização de timers
         if self.dash_timer > 0:
