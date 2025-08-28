@@ -63,9 +63,9 @@ class GameRenderer:
             pygame.draw.rect(self.screen, GROUND_STRIPE_COLOR, 
                            (x, GROUND_Y + 16, stripe_width // 3, 6))
 
-    def draw_hud(self, distance):
+    def draw_hud(self, distance, player=None):
         """Desenha a interface do usuário durante o jogo."""
-        # Controles atualizados
+        # Controles
         controls_text = "←/→ correr | Z pular | X dash | A atirar | ESC pause"
         controls_surface = self.font.render(controls_text, True, UI_TEXT_COLOR)
         self.screen.blit(controls_surface, (16, 12))
@@ -74,6 +74,10 @@ class GameRenderer:
         distance_text = f"Distância: {int(distance):04d}px"
         distance_surface = self.distance_font.render(distance_text, True, DISTANCE_TEXT_COLOR)
         self.screen.blit(distance_surface, (WINDOW_WIDTH - 260, 10))
+        
+        # Barra de vida (só desenha se player foi passado)
+        if player:
+            self._draw_health_bar(player)
 
     def draw_player(self, player):
         """Desenha o jogador."""
@@ -82,3 +86,39 @@ class GameRenderer:
     def draw_projectiles(self, projectiles):
         """Desenha todos os projéteis."""
         projectiles.draw(self.screen)
+
+    def _draw_health_bar(self, player):
+        """Desenha a barra de vida do jogador."""
+        # Posição da barra
+        bar_x = 16
+        bar_y = 45
+        bar_width = 200
+        bar_height = 20
+        
+        # Fundo da barra (bordas)
+        pygame.draw.rect(self.screen, (50, 50, 50), 
+                        (bar_x - 2, bar_y - 2, bar_width + 4, bar_height + 4))
+        pygame.draw.rect(self.screen, (100, 100, 100), 
+                        (bar_x, bar_y, bar_width, bar_height))
+        
+        # Calcula a largura da barra baseada na vida
+        health_ratio = player.current_health / player.max_health
+        health_width = int(bar_width * health_ratio)
+        
+        # Cor da barra baseada na porcentagem de vida
+        if health_ratio > 0.6:
+            health_color = (50, 200, 50)    # Verde (boa saúde)
+        elif health_ratio > 0.3:
+            health_color = (200, 200, 50)   # Amarelo (atenção)
+        else:
+            health_color = (200, 50, 50)    # Vermelho (perigo)
+        
+        # Desenha a barra de vida se ainda tem vida
+        if health_width > 0:
+            pygame.draw.rect(self.screen, health_color, 
+                            (bar_x, bar_y, health_width, bar_height))
+        
+        # Texto da vida
+        health_text = f"LIFE: {player.current_health}/{player.max_health}"
+        health_surface = pygame.font.SysFont('Arial', 16).render(health_text, True, UI_TEXT_COLOR)
+        self.screen.blit(health_surface, (bar_x + bar_width + 10, bar_y + 2))

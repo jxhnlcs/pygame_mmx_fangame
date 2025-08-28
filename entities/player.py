@@ -16,6 +16,15 @@ class Player(pygame.sprite.Sprite):
         self._init_animation_state()
         self._init_timers()
         self._init_input_state()
+
+        # NOVO: Sistema de vida
+        self.max_health = 16  # Vida máxima (padrão Megaman)
+        self.current_health = self.max_health
+        self.is_alive = True
+        self.invincibility_timer = 0  # Tempo de invencibilidade após levar dano
+        self.invincibility_duration = 1000  # 1 segundo de invencibilidade
+        self.damage_flash_timer = 0
+        self.original_image = None
         
         # Referência para grupo de projéteis (será definida externamente)
         self.projectiles = None
@@ -296,3 +305,53 @@ class Player(pygame.sprite.Sprite):
         self.handle_input(keys)
         self.apply_physics(dt)
         self.animate(dt)
+        self.update_damage_effects(dt)
+
+    def take_damage(self, damage=2):
+        if self.invincibility_timer > 0 or not self.is_alive:
+            return False
+        
+        self.current_health -= damage
+        self.invincibility_timer = self.invincibility_duration
+        self.damage_flash_timer = 200  # Flash de dano
+        
+        print(f"[Player] Levou dano! Vida: {self.current_health}/{self.max_health}")
+        
+        if self.current_health <= 0:
+            self.current_health = 0
+            self.is_alive = False
+            print("[Player] Game Over!")
+            return True  # Indica que morreu
+        
+        return False
+
+    def update_damage_effects(self, dt):
+        """Atualiza efeitos visuais de dano."""
+        if self.invincibility_timer > 0:
+            self.invincibility_timer -= dt
+            
+            # Flash de dano
+            if self.damage_flash_timer > 0:
+                self.damage_flash_timer -= dt
+                # Pisca entre normal e avermelhado
+                if int(self.damage_flash_timer / 50) % 2 == 0:
+                    # Cria versão avermelhada da imagem
+                    if self.original_image is None:
+                        self.original_image = self.image.copy()
+                    
+                    red_surface = pygame.Surface(self.image.get_size())
+                    red_surface.fill((255, 100, 100))
+                    red_surface.set_alpha(100)
+                    
+                    temp_image = self.original_image.copy()
+                    temp_image.blit(red_surface, (0, 0), special_flags=pygame.BLEND_ADD)
+                    self.image = temp_image
+            else:
+                self.original_image = None
+
+    def reset_health(self):
+        """Reseta a vida do jogador."""
+        self.current_health = self.max_health
+        self.is_alive = True
+        self.invincibility_timer = 0
+        self.damage_flash_timer = 0

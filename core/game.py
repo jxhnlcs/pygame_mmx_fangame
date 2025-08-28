@@ -220,6 +220,7 @@ class Game:
             self.player.rect.midbottom = (WINDOW_WIDTH // 2, GROUND_Y)
             self.player.is_on_ground = True
             self.player.facing_direction = 1
+            self.player.reset_health()  # NOVA LINHA - reseta a vida
             
         if self.camera:
             self.camera.x = 0.0
@@ -251,15 +252,21 @@ class Game:
 
     def _check_game_over_conditions(self):
         """Verifica condições de game over."""
-        if self.player and self.enemy_manager:
-            # Game over se foi atingido por projétil inimigo
+        if not self.player or not self.player.is_alive:
+            return True
+            
+        if self.enemy_manager:
+            # Verifica se foi atingido por projétil inimigo
             if self.enemy_manager.check_enemy_projectile_collision(self.player.rect):
                 print("[Game] Jogador atingido por projétil inimigo!")
-                return True
+                died = self.player.take_damage(4)  # Dano do projétil inimigo
+                return died  # Retorna True se morreu
                 
             # Game over se cair muito abaixo do chão
             if self.player.rect.top > WINDOW_HEIGHT + 100:
+                self.player.is_alive = False
                 return True
+                
         return False
 
     def handle_events(self):
@@ -366,13 +373,13 @@ class Game:
             # Desenha jogador e projéteis
             self.renderer.draw_player(self.player)
             self.renderer.draw_projectiles(self.projectiles)
-            self.renderer.draw_hud(self.distance)
+            self.renderer.draw_hud(self.distance, self.player)  # MUDANÇA: passa o player
             
         elif current_state == GameState.PAUSED:
             self.pause_screen.render(self.game_surface)
         elif current_state == GameState.GAME_OVER:
             self.game_over_screen.render()
-        
+    
         pygame.display.flip()
 
     def run(self):

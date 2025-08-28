@@ -11,7 +11,7 @@ class Enemy(pygame.sprite.Sprite):
     def __init__(self, world_x, sprite_sheet, projectile_image):
         super().__init__()
         self.world_x = world_x
-        self.world_y = GROUND_Y  # Alinha com o chão
+        self.world_y = GROUND_Y
         self.sprite_sheet = sprite_sheet
         self.projectile_image = projectile_image
         
@@ -27,9 +27,9 @@ class Enemy(pygame.sprite.Sprite):
         self.animation_timer = 0
         self.animation_speed = 150  # ms por frame
         
-        # Tiro
+        # Tiro - VALORES CORRIGIDOS
         self.shoot_timer = 0
-        self.shoot_cooldown = 1500  # 1.5 segundos entre tiros
+        self.shoot_cooldown = 2000  # 2 segundos entre tiros
         self.can_shoot = False
         
         # Carrega animações
@@ -43,6 +43,7 @@ class Enemy(pygame.sprite.Sprite):
         
         # Grupo de projéteis (será definido externamente)
         self.projectiles = None
+        print(f"[Enemy] Criado na posição {self.world_x}")
         
     def _load_animations(self):
         """Carrega as animações do inimigo."""
@@ -58,26 +59,39 @@ class Enemy(pygame.sprite.Sprite):
         ]
         
         # Extrai e escala os frames
-        for rect in frame_rects:
+        for i, rect in enumerate(frame_rects):
             try:
                 x, y, w, h = rect
-                frame = self.sprite_sheet.subsurface(pygame.Rect(x, y, w, h)).copy()
-                
-                # CORREÇÃO: Define a cor de transparência ANTES de escalar
-                frame.set_colorkey((255, 255, 255))  # Remove fundo branco
-                frame = frame.convert_alpha()  # Converte para formato com alpha
-                
-                # Escala o frame
-                scaled_frame = pygame.transform.scale(frame, (w * SPRITE_SCALE, h * SPRITE_SCALE))
-                
-                self.animation_frames.append(scaled_frame)
+                # Verifica se o frame está dentro dos limites da sprite sheet
+                if (x + w <= self.sprite_sheet.get_width() and 
+                    y + h <= self.sprite_sheet.get_height()):
+                    
+                    frame = self.sprite_sheet.subsurface(pygame.Rect(x, y, w, h)).copy()
+                    
+                    # CORREÇÃO: Remove fundo branco e converte para alpha
+                    frame.set_colorkey((255, 255, 255))  # Remove fundo branco
+                    frame = frame.convert_alpha()
+                    
+                    # Escala o frame
+                    scaled_frame = pygame.transform.scale(frame, (w * SPRITE_SCALE, h * SPRITE_SCALE))
+                    self.animation_frames.append(scaled_frame)
+                else:
+                    # Frame fora dos limites, cria frame temporário
+                    raise Exception(f"Frame {i+1} fora dos limites da sprite sheet")
+                    
             except Exception as e:
-                print(f"[Enemy] Erro ao carregar frame {rect}: {e}")
-                # Se falhar, cria um frame temporário SEM fundo branco
+                print(f"[Enemy] Erro no frame {i+1}: {e}")
+                # Frame temporário melhorado SEM fundo branco
                 temp_frame = pygame.Surface((32 * SPRITE_SCALE, 32 * SPRITE_SCALE), pygame.SRCALPHA)
-                temp_frame.fill((0, 0, 0, 0))  # Transparente
-                pygame.draw.circle(temp_frame, (100, 100, 200), 
-                                 (16 * SPRITE_SCALE, 16 * SPRITE_SCALE), 12 * SPRITE_SCALE)
+                temp_frame.fill((0, 0, 0, 0))  # Totalmente transparente
+                
+                # Desenha um robô simples
+                center_x, center_y = 16 * SPRITE_SCALE, 16 * SPRITE_SCALE
+                pygame.draw.circle(temp_frame, (100, 100, 200), (center_x, center_y), 12 * SPRITE_SCALE)
+                pygame.draw.rect(temp_frame, (80, 80, 180), 
+                            (center_x - 8 * SPRITE_SCALE, center_y + 8 * SPRITE_SCALE, 
+                                16 * SPRITE_SCALE, 8 * SPRITE_SCALE))
+                
                 self.animation_frames.append(temp_frame)
     
     def update_screen_position(self, camera_x):
@@ -95,32 +109,37 @@ class Enemy(pygame.sprite.Sprite):
         if not self.has_seen_player and self.is_visible_on_screen(camera_x):
             # Jogador entrou no campo de visão
             distance_to_player = abs(player_world_x - self.world_x)
-            if distance_to_player < 400:  # Range de detecção
+            if distance_to_player < 500:  # Aumenta o range de detecção
                 self.has_seen_player = True
                 self.can_shoot = True
-                print(f"[Enemy] Jogador detectado! Iniciando sequência de ataque.")
+                self.shoot_timer = 0  # IMPORTANTE: Zera o timer para permitir tiro imediato
+                print(f"[Enemy] Jogador detectado! Distância: {distance_to_player}, Posição inimigo: {self.world_x}, Posição jogador: {player_world_x}")
+
     
     def shoot_at_player(self, player_world_x, player_screen_y):
         """Atira um projétil em direção ao jogador."""
-        if not self.can_shoot or self.shoot_timer > 0 or not self.is_alive:
+        if not self.can_shoot or not self.is_alive:
             return
+        
+        print(f"[Enemy] DISPARANDO no frame 6! Frame atual: {self.current_frame}")
         
         # Calcula direção do tiro
         direction_x = 1 if player_world_x > self.world_x else -1
         
-        # Posição inicial do projétil
+        # Posição inicial do projétil (na altura do inimigo)
         projectile_world_x = self.world_x + (20 * SPRITE_SCALE * direction_x)
-        projectile_screen_y = self.rect.centery
+        projectile_screen_y = self.rect.centery  # Altura do centro do inimigo
         
         # Cria projétil
         projectile = EnemyProjectile(self.projectile_image, projectile_world_x, projectile_screen_y, direction_x)
         
-        if self.projectiles:
+        # Adiciona o projétil
+        if self.projectiles is not None:
             self.projectiles.add(projectile)
+            print(f"[Enemy] Projétil criado no frame 6! Direção: {direction_x}")
         
         # Reset do timer
         self.shoot_timer = self.shoot_cooldown
-        print(f"[Enemy] Atirando em direção ao jogador!")
     
     def take_damage(self, damage=1):
         """Aplica dano ao inimigo."""
@@ -151,19 +170,22 @@ class Enemy(pygame.sprite.Sprite):
         # Se viu o jogador, anima e atira
         if self.has_seen_player:
             # Atualiza animação
+            previous_frame = self.current_frame  # Salva o frame anterior
+            
             self.animation_timer += dt
             if self.animation_timer >= self.animation_speed:
                 self.animation_timer = 0
                 self.current_frame = (self.current_frame + 1) % len(self.animation_frames)
                 self.image = self.animation_frames[self.current_frame]
+                
+                # NOVO: Dispara APENAS quando muda para o frame 6 (índice 5)
+                if self.current_frame == 5 and previous_frame != 5:  # Frame 6 (índice 5)
+                    if self.can_shoot and self.shoot_timer <= 0 and self.is_visible_on_screen(camera_x):
+                        self.shoot_at_player(player_world_x, player_screen_y)
             
             # Atualiza timer de tiro
             if self.shoot_timer > 0:
                 self.shoot_timer -= dt
-            
-            # Atira se estiver na tela e puder atirar
-            if self.is_visible_on_screen(camera_x):
-                self.shoot_at_player(player_world_x, player_screen_y)
     
     def check_collision_with_projectile(self, projectile_rect):
         """Verifica colisão com projétil do jogador."""
@@ -229,6 +251,9 @@ class EnemyManager:
             # Remove inimigos muito atrás
             if enemy.world_x < player_world_x - 1000:
                 enemy.kill()
+        
+        # ADICIONE ESTE DEBUG:
+        print(f"[EnemyManager] Projéteis inimigos ativos: {len(self.enemy_projectiles.sprites())}")
         
         # Atualiza projéteis dos inimigos
         self.enemy_projectiles.update(dt, camera_x)
