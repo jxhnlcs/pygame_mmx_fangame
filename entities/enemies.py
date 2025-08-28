@@ -48,11 +48,11 @@ class Enemy(pygame.sprite.Sprite):
         """Carrega as animações do inimigo."""
         # Coordenadas dos frames na sprite sheet
         frame_rects = [
-            (4, 3, 47, 61),    # Frame 1
-            (144, 3, 47, 61),   # Frame 2
-            (191, 3, 47, 61),   # Frame 3
-            (284, 3, 53, 32),   # Frame 4
-            (7, 76, 53, 62),  # Frame 5
+            (4, 1, 47, 61),    # Frame 1
+            (144, 1, 47, 61),   # Frame 2
+            (191, 1, 47, 61),   # Frame 3
+            (284, 1, 53, 32),   # Frame 4
+            (7, 75, 53, 62),  # Frame 5
             (70, 75, 53, 64),  # Frame 6
             (133, 75, 45, 64),  # Frame 7
         ]
