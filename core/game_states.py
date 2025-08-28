@@ -1,10 +1,8 @@
-"""Sistema de estados do jogo"""
 import pygame
 from enum import Enum
 from config.settings import *
 
 class ScoreManager:
-    """Gerencia o sistema de pontuação e ranking."""
     
     def __init__(self):
         self.scores_file = "highscores.txt"
@@ -12,7 +10,6 @@ class ScoreManager:
         self.high_scores = self.load_scores()
     
     def load_scores(self):
-        """Carrega as pontuações salvas."""
         try:
             with open(self.scores_file, 'r') as f:
                 scores = []
@@ -27,22 +24,19 @@ class ScoreManager:
             return []
     
     def save_scores(self):
-        """Salva as pontuações no arquivo."""
         try:
             with open(self.scores_file, 'w') as f:
                 for score in self.high_scores:
                     f.write(f"{score}\n")
         except Exception as e:
-            print(f"[ScoreManager] Erro ao salvar: {e}")
+            pass
     
     def add_score(self, distance):
-        """Adiciona uma nova pontuação."""
         self.high_scores.append(distance)
         self.high_scores.sort(reverse=True)
         self.high_scores = self.high_scores[:self.max_scores]
         self.save_scores()
         
-        # Retorna a posição no ranking (1-indexed)
         try:
             position = self.high_scores.index(distance) + 1
             return position
@@ -50,13 +44,10 @@ class ScoreManager:
             return None
     
     def get_best_score(self):
-        """Retorna a melhor pontuação."""
         return self.high_scores[0] if self.high_scores else 0
 
-# SUBSTITUA a classe GameOverScreen inteira por esta versão com ranking:
 
 class GameOverScreen:
-    """Tela de game over com sistema de ranking."""
     
     def __init__(self, screen):
         self.screen = screen
@@ -68,7 +59,6 @@ class GameOverScreen:
         self.selected_option = 0
         self.options = ["TENTAR NOVAMENTE", "MENU PRINCIPAL"]
         
-        # Cores
         self.title_color = (255, 100, 100)
         self.stats_color = (200, 200, 255)
         self.selected_color = (255, 255, 100)
@@ -76,26 +66,21 @@ class GameOverScreen:
         self.ranking_color = (150, 255, 150)
         self.new_record_color = (255, 255, 100)
         
-        # Estatísticas do jogo
         self.distance = 0
         self.time_played = 0
         self.ranking_position = None
         self.is_new_record = False
         
-        # Score manager
         self.score_manager = ScoreManager()
         
     def set_stats(self, distance, time_played):
-        """Define as estatísticas finais."""
         self.distance = distance
         self.time_played = time_played
         
-        # Adiciona ao ranking
         self.ranking_position = self.score_manager.add_score(distance)
         self.is_new_record = self.ranking_position == 1 and len(self.score_manager.high_scores) > 1
         
     def handle_input(self, keys, key_pressed):
-        """Processa input do game over."""
         action = None
         
         if key_pressed.get(pygame.K_UP, False):
@@ -105,9 +90,9 @@ class GameOverScreen:
             self.selected_option = (self.selected_option + 1) % len(self.options)
             
         if key_pressed.get(pygame.K_RETURN, False):
-            if self.selected_option == 0:  # TENTAR NOVAMENTE
+            if self.selected_option == 0:
                 action = "restart"
-            elif self.selected_option == 1:  # MENU PRINCIPAL
+            elif self.selected_option == 1:
                 action = "menu"
                 
         if key_pressed.get(pygame.K_ESCAPE, False):
@@ -116,21 +101,17 @@ class GameOverScreen:
         return action
         
     def render(self):
-        """Renderiza a tela de game over com ranking."""
         self.screen.fill((40, 20, 20))
         
-        # Título
         title_text = self.font_title.render("GAME OVER", True, self.title_color)
         title_rect = title_text.get_rect(center=(WINDOW_WIDTH // 2, 80))
         self.screen.blit(title_text, title_rect)
         
-        # Novo recorde
         if self.is_new_record:
             record_text = self.font_stats.render("NOVO RECORDE!", True, self.new_record_color)
             record_rect = record_text.get_rect(center=(WINDOW_WIDTH // 2, 120))
             self.screen.blit(record_text, record_rect)
         
-        # Estatísticas
         stats_y = 160
         if self.ranking_position:
             ranking_text = f"Posição no Ranking: {self.ranking_position}º lugar"
@@ -151,10 +132,8 @@ class GameOverScreen:
         self.screen.blit(distance_surface, distance_rect)
         self.screen.blit(time_surface, time_rect)
         
-        # Ranking das melhores pontuações
         self._draw_high_scores(stats_y + 80)
         
-        # Opções
         start_y = 420
         for i, option in enumerate(self.options):
             color = self.selected_color if i == self.selected_option else self.normal_color
@@ -162,20 +141,17 @@ class GameOverScreen:
             text_rect = text.get_rect(center=(WINDOW_WIDTH // 2, start_y + i * 40))
             self.screen.blit(text, text_rect)
             
-            # Indicador
             if i == self.selected_option:
                 indicator = self.font_menu.render("►", True, self.selected_color)
                 indicator_rect = indicator.get_rect(center=(text_rect.left - 25, text_rect.centery))
                 self.screen.blit(indicator, indicator_rect)
         
-        # Instruções
         instructions = "ENTER Selecionar | ESC Menu Principal"
         instructions_surface = self.font_menu.render(instructions, True, (150, 150, 150))
         instructions_rect = instructions_surface.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 30))
         self.screen.blit(instructions_surface, instructions_rect)
     
     def _draw_high_scores(self, start_y):
-        """Desenha o ranking das melhores pontuações."""
         title = self.font_stats.render("MELHORES DISTÂNCIAS", True, self.stats_color)
         title_rect = title.get_rect(center=(WINDOW_WIDTH // 2, start_y))
         self.screen.blit(title, title_rect)
@@ -199,28 +175,23 @@ class GameState(Enum):
 
 
 class StateManager:
-    """Gerencia os estados do jogo."""
     
     def __init__(self):
         self.current_state = GameState.MENU
         self.previous_state = None
         
     def change_state(self, new_state):
-        """Muda para um novo estado."""
         self.previous_state = self.current_state
         self.current_state = new_state
         
     def get_current_state(self):
-        """Retorna o estado atual."""
         return self.current_state
         
     def get_previous_state(self):
-        """Retorna o estado anterior."""
         return self.previous_state
 
 
 class MenuScreen:
-    """Tela de menu inicial."""
     
     def __init__(self, screen):
         self.screen = screen
@@ -231,32 +202,27 @@ class MenuScreen:
         self.selected_option = 0
         self.options = ["INICIAR JOGO", "SAIR"]
         
-        # Cores
         self.title_color = (100, 150, 255)
         self.selected_color = (255, 255, 100)
         self.normal_color = (200, 200, 200)
         self.subtitle_color = (150, 150, 150)
         
     def handle_input(self, keys, key_pressed):
-        """Processa input do menu."""
         action = None
         
-        # Debug: vamos verificar o que está chegando
         up_pressed = key_pressed.get(pygame.K_UP, False)
         down_pressed = key_pressed.get(pygame.K_DOWN, False)
         
         if up_pressed:
             self.selected_option = (self.selected_option - 1) % len(self.options)
-            print(f"[DEBUG] UP pressionado, opção: {self.selected_option}")
             
         if down_pressed:
             self.selected_option = (self.selected_option + 1) % len(self.options)
-            print(f"[DEBUG] DOWN pressionado, opção: {self.selected_option}")
             
         if key_pressed.get(pygame.K_RETURN, False):
-            if self.selected_option == 0:  # INICIAR JOGO
+            if self.selected_option == 0:
                 action = "start_game"
-            elif self.selected_option == 1:  # SAIR
+            elif self.selected_option == 1:
                 action = "quit"
                 
         if key_pressed.get(pygame.K_ESCAPE, False):
@@ -265,20 +231,16 @@ class MenuScreen:
         return action
         
     def render(self):
-        """Renderiza o menu."""
         self.screen.fill((20, 30, 50))
         
-        # Título
         title_text = self.font_title.render("MEGA MAN X", True, self.title_color)
         title_rect = title_text.get_rect(center=(WINDOW_WIDTH // 2, 120))
         self.screen.blit(title_text, title_rect)
         
-        # Subtítulo
         subtitle_text = self.font_subtitle.render("John Lucas ~ Megaman X Runner", True, self.subtitle_color)
         subtitle_rect = subtitle_text.get_rect(center=(WINDOW_WIDTH // 2, 160))
         self.screen.blit(subtitle_text, subtitle_rect)
         
-        # Opções do menu
         start_y = 250
         for i, option in enumerate(self.options):
             color = self.selected_color if i == self.selected_option else self.normal_color
@@ -286,13 +248,11 @@ class MenuScreen:
             text_rect = text.get_rect(center=(WINDOW_WIDTH // 2, start_y + i * 50))
             self.screen.blit(text, text_rect)
             
-            # Indicador de seleção
             if i == self.selected_option:
                 indicator = self.font_menu.render("►", True, self.selected_color)
                 indicator_rect = indicator.get_rect(center=(text_rect.left - 30, text_rect.centery))
                 self.screen.blit(indicator, indicator_rect)
         
-        # Controles
         controls_text = "↑/↓ Navegar | ENTER Selecionar | ESC Sair"
         controls_surface = self.font_subtitle.render(controls_text, True, self.subtitle_color)
         controls_rect = controls_surface.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 50))
@@ -300,7 +260,6 @@ class MenuScreen:
 
 
 class PauseScreen:
-    """Tela de pause."""
     
     def __init__(self, screen):
         self.screen = screen
@@ -310,33 +269,28 @@ class PauseScreen:
         self.selected_option = 0
         self.options = ["CONTINUAR", "REINICIAR", "MENU PRINCIPAL"]
         
-        # Cores
         self.title_color = (255, 255, 255)
         self.selected_color = (255, 255, 100)
         self.normal_color = (200, 200, 200)
         
     def handle_input(self, keys, key_pressed):
-        """Processa input do pause."""
         action = None
         
-        # Debug para pause
         up_pressed = key_pressed.get(pygame.K_UP, False)
         down_pressed = key_pressed.get(pygame.K_DOWN, False)
         
         if up_pressed:
             self.selected_option = (self.selected_option - 1) % len(self.options)
-            print(f"[DEBUG PAUSE] UP pressionado, opção: {self.selected_option}")
             
         if down_pressed:
             self.selected_option = (self.selected_option + 1) % len(self.options)
-            print(f"[DEBUG PAUSE] DOWN pressionado, opção: {self.selected_option}")
             
         if key_pressed.get(pygame.K_RETURN, False):
-            if self.selected_option == 0:  # CONTINUAR
+            if self.selected_option == 0:
                 action = "resume"
-            elif self.selected_option == 1:  # REINICIAR
+            elif self.selected_option == 1:
                 action = "restart"
-            elif self.selected_option == 2:  # MENU PRINCIPAL
+            elif self.selected_option == 2:
                 action = "menu"
                 
         if key_pressed.get(pygame.K_ESCAPE, False):
@@ -345,8 +299,6 @@ class PauseScreen:
         return action
         
     def render(self, background_surface=None):
-        """Renderiza a tela de pause."""
-        # Desenha o jogo em pausa no fundo (escurecido)
         if background_surface:
             darkened = background_surface.copy()
             dark_overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -357,18 +309,15 @@ class PauseScreen:
         else:
             self.screen.fill((40, 40, 60))
         
-        # Painel central
         panel_rect = pygame.Rect(WINDOW_WIDTH // 4, WINDOW_HEIGHT // 4, 
                                 WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2)
         pygame.draw.rect(self.screen, (30, 40, 60), panel_rect)
         pygame.draw.rect(self.screen, (100, 120, 150), panel_rect, 3)
         
-        # Título
         title_text = self.font_title.render("PAUSE", True, self.title_color)
         title_rect = title_text.get_rect(center=(WINDOW_WIDTH // 2, panel_rect.top + 60))
         self.screen.blit(title_text, title_rect)
         
-        # Opções
         start_y = panel_rect.centery - 20
         for i, option in enumerate(self.options):
             color = self.selected_color if i == self.selected_option else self.normal_color
@@ -376,100 +325,7 @@ class PauseScreen:
             text_rect = text.get_rect(center=(WINDOW_WIDTH // 2, start_y + i * 40))
             self.screen.blit(text, text_rect)
             
-            # Indicador
             if i == self.selected_option:
                 indicator = self.font_menu.render("►", True, self.selected_color)
                 indicator_rect = indicator.get_rect(center=(text_rect.left - 25, text_rect.centery))
                 self.screen.blit(indicator, indicator_rect)
-
-
-class GameOverScreen:
-    """Tela de game over."""
-    
-    def __init__(self, screen):
-        self.screen = screen
-        self.font_title = pygame.font.SysFont('Arial', 42, bold=True)
-        self.font_stats = pygame.font.SysFont('Arial', 20)
-        self.font_menu = pygame.font.SysFont('Arial', 18)
-        
-        self.selected_option = 0
-        self.options = ["TENTAR NOVAMENTE", "MENU PRINCIPAL"]
-        
-        # Cores
-        self.title_color = (255, 100, 100)
-        self.stats_color = (200, 200, 255)
-        self.selected_color = (255, 255, 100)
-        self.normal_color = (200, 200, 200)
-        
-        # Estatísticas do jogo
-        self.distance = 0
-        self.time_played = 0
-        
-    def set_stats(self, distance, time_played):
-        """Define as estatísticas finais."""
-        self.distance = distance
-        self.time_played = time_played
-        
-    def handle_input(self, keys, key_pressed):
-        """Processa input do game over."""
-        action = None
-        
-        if key_pressed.get(pygame.K_UP, False):
-            self.selected_option = (self.selected_option - 1) % len(self.options)
-            
-        if key_pressed.get(pygame.K_DOWN, False):
-            self.selected_option = (self.selected_option + 1) % len(self.options)
-            
-        if key_pressed.get(pygame.K_RETURN, False):
-            if self.selected_option == 0:  # TENTAR NOVAMENTE
-                action = "restart"
-            elif self.selected_option == 1:  # MENU PRINCIPAL
-                action = "menu"
-                
-        if key_pressed.get(pygame.K_ESCAPE, False):
-            action = "menu"
-            
-        return action
-        
-    def render(self):
-        """Renderiza a tela de game over."""
-        self.screen.fill((40, 20, 20))
-        
-        # Título
-        title_text = self.font_title.render("GAME OVER", True, self.title_color)
-        title_rect = title_text.get_rect(center=(WINDOW_WIDTH // 2, 120))
-        self.screen.blit(title_text, title_rect)
-        
-        # Estatísticas
-        stats_y = 200
-        distance_text = f"Distância Percorrida: {int(self.distance)} pixels"
-        time_text = f"Tempo Jogado: {int(self.time_played / 1000)}s"
-        
-        distance_surface = self.font_stats.render(distance_text, True, self.stats_color)
-        time_surface = self.font_stats.render(time_text, True, self.stats_color)
-        
-        distance_rect = distance_surface.get_rect(center=(WINDOW_WIDTH // 2, stats_y))
-        time_rect = time_surface.get_rect(center=(WINDOW_WIDTH // 2, stats_y + 30))
-        
-        self.screen.blit(distance_surface, distance_rect)
-        self.screen.blit(time_surface, time_rect)
-        
-        # Opções
-        start_y = 320
-        for i, option in enumerate(self.options):
-            color = self.selected_color if i == self.selected_option else self.normal_color
-            text = self.font_menu.render(option, True, color)
-            text_rect = text.get_rect(center=(WINDOW_WIDTH // 2, start_y + i * 40))
-            self.screen.blit(text, text_rect)
-            
-            # Indicador
-            if i == self.selected_option:
-                indicator = self.font_menu.render("►", True, self.selected_color)
-                indicator_rect = indicator.get_rect(center=(text_rect.left - 25, text_rect.centery))
-                self.screen.blit(indicator, indicator_rect)
-        
-        # Instruções
-        instructions = "ENTER Selecionar | ESC Menu Principal"
-        instructions_surface = self.font_menu.render(instructions, True, (150, 150, 150))
-        instructions_rect = instructions_surface.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 50))
-        self.screen.blit(instructions_surface, instructions_rect)
