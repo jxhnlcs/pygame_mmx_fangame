@@ -4,7 +4,7 @@
 WINDOW_WIDTH = 960
 WINDOW_HEIGHT = 540
 FPS = 60
-WINDOW_TITLE = "Mega Man X - Runner Demo"
+WINDOW_TITLE = "John Lucas ~ Megaman X Runner"
 
 # Graphics
 SPRITE_SCALE = 3

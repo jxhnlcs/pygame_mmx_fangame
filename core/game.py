@@ -147,10 +147,10 @@ class Game:
         try:
             pygame.mixer.init()
             
-            # Carrega som de disparo
-            shoot_sound_path = Path(__file__).parent.parent / "assets" / "sound-effects" / "shoots"
+            sound_effects_path = Path(__file__).parent.parent / "assets" / "sound-effects"
             
-            # Procura por arquivos de áudio na pasta shoots
+            # Carrega som de disparo (já existe)
+            shoot_sound_path = sound_effects_path / "shoots"
             sound_files = list(shoot_sound_path.glob("*.wav")) + list(shoot_sound_path.glob("*.mp3"))
             
             if sound_files:
@@ -159,9 +159,38 @@ class Game:
             else:
                 self.shoot_sound = None
                 print("[SFX] Nenhum arquivo de som encontrado na pasta shoots")
+            
+            # CORRIGIDO: Som de dano - busca na pasta damage
+            damage_sound_path = sound_effects_path / "damage"
+            damage_sound_files = list(damage_sound_path.glob("hurt*.wav")) + list(damage_sound_path.glob("hurt*.mp3"))
+            if damage_sound_files:
+                self.damage_sound = pygame.mixer.Sound(str(damage_sound_files[0]))
+                print(f"[SFX] Som de dano carregado: {damage_sound_files[0].name}")
+            else:
+                self.damage_sound = None
+                print("[SFX] Nenhum arquivo de som de dano encontrado na pasta damage")
+            
+            # CORRIGIDO: Som de morte - busca na pasta damage também
+            death_sound_files = list(damage_sound_path.glob("die*.wav")) + list(damage_sound_path.glob("die*.mp3"))
+            if death_sound_files:
+                self.death_sound = pygame.mixer.Sound(str(death_sound_files[0]))
+                print(f"[SFX] Som de morte carregado: {death_sound_files[0].name}")
+            else:
+                self.death_sound = None
+                print("[SFX] Nenhum arquivo de som de morte encontrado na pasta damage")
+            
+            # DEBUG: Lista todos os arquivos encontrados
+            print(f"[DEBUG] Arquivos na pasta damage:")
+            if damage_sound_path.exists():
+                for file in damage_sound_path.iterdir():
+                    print(f"  - {file.name}")
+            else:
+                print("  Pasta damage não existe!")
                 
         except Exception as e:
             self.shoot_sound = None
+            self.damage_sound = None
+            self.death_sound = None
             print(f"[SFX] Erro ao carregar efeitos sonoros: {e}")
 
     def _create_entities(self):
@@ -169,15 +198,17 @@ class Game:
         # Define os retângulos das animações do jogador
         animation_rects = {
             'run': [(106, 108, 30, 33), (137, 108, 20, 33), (158, 108, 23, 33), 
-                   (181, 108, 32, 33), (213, 108, 34, 33), (247, 108, 26, 33), 
-                   (276, 108, 22, 33), (298, 108, 25, 33), (326, 108, 30, 33), 
-                   (357, 108, 34, 33), (391, 108, 29, 33)],
+                (181, 108, 32, 33), (213, 108, 34, 33), (247, 108, 26, 33), 
+                (276, 108, 22, 33), (298, 108, 25, 33), (326, 108, 30, 33), 
+                (357, 108, 34, 33), (391, 108, 29, 33)],
             'jump': [(168, 66, 29, 34), (202, 63, 24, 37), (229, 58, 19, 43), 
                     (252, 54, 19, 46), (273, 58, 25, 42), (299, 61, 27, 39), 
                     (331, 62, 24, 38), (356, 68, 30, 32)],
             'dash': [(282, 157, 33, 35), (317, 161, 41, 27), (317, 161, 41, 27)],
             'shoot': [(133, 66, 30, 34), (168, 66, 29, 34)],
-            'idle': (321, 15, 36, 36)
+            'idle': (321, 15, 36, 36),
+            # NOVO: Adiciona sprites de dano aqui
+            'damage': [(39, 702, 24, 37), (64, 701, 26, 37), (91, 696, 37, 46), (64, 701, 26, 37), (91, 696, 37, 46)]
         }
         
         # Define coordenadas do projétil no buster sheet
@@ -188,8 +219,10 @@ class Game:
         # Cria o jogador
         self.player = Player(self.sprite_sheet, animation_rects, self.buster_sheet, buster_rects)
         
-        # Define som de disparo para o jogador
+        # MODIFICADO: Atribui todos os sons ao jogador
         self.player.shoot_sound = getattr(self, 'shoot_sound', None)
+        self.player.damage_sound = getattr(self, 'damage_sound', None)
+        self.player.death_sound = getattr(self, 'death_sound', None)
         
         # Grupo de projéteis do jogador
         self.projectiles = pygame.sprite.Group()

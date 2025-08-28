@@ -252,9 +252,6 @@ class EnemyManager:
             if enemy.world_x < player_world_x - 1000:
                 enemy.kill()
         
-        # ADICIONE ESTE DEBUG:
-        print(f"[EnemyManager] Projéteis inimigos ativos: {len(self.enemy_projectiles.sprites())}")
-        
         # Atualiza projéteis dos inimigos
         self.enemy_projectiles.update(dt, camera_x)
         

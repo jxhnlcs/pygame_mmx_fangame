@@ -274,7 +274,7 @@ class MenuScreen:
         self.screen.blit(title_text, title_rect)
         
         # Subtítulo
-        subtitle_text = self.font_subtitle.render("Runner Demo", True, self.subtitle_color)
+        subtitle_text = self.font_subtitle.render("John Lucas ~ Megaman X Runner", True, self.subtitle_color)
         subtitle_rect = subtitle_text.get_rect(center=(WINDOW_WIDTH // 2, 160))
         self.screen.blit(subtitle_text, subtitle_rect)
         

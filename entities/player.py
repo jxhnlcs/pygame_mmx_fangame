@@ -10,26 +10,44 @@ class Player(pygame.sprite.Sprite):
     
     def __init__(self, sprite_sheet, animation_rects, buster_sheet, buster_rects):
         super().__init__()
+        
+        # PRIMEIRO: Inicializa como dicionário vazio (não sobrescreve depois)
+        self.damage_sprites = {'right': [], 'left': []}
+        
+        # DEPOIS: Carrega as animações (que vai preencher damage_sprites)
         self._load_animations(sprite_sheet, animation_rects, buster_sheet, buster_rects)
+        
         self._init_sprite()
         self._init_physics()
         self._init_animation_state()
         self._init_timers()
         self._init_input_state()
 
-        # NOVO: Sistema de vida
-        self.max_health = 16  # Vida máxima (padrão Megaman)
+        # Sistema de vida
+        self.max_health = 16
         self.current_health = self.max_health
         self.is_alive = True
-        self.invincibility_timer = 0  # Tempo de invencibilidade após levar dano
-        self.invincibility_duration = 1000  # 1 segundo de invencibilidade
+        self.invincibility_timer = 0
+        self.invincibility_duration = 1000
         self.damage_flash_timer = 0
         self.original_image = None
+
+        # Sistema de dano visual (NÃO redefine damage_sprites aqui!)
+        # REMOVIDO: self.damage_sprites = {'right': [], 'left': []}  # Esta linha estava sobrescrevendo!
+        self.is_taking_damage = False
+        self.damage_animation_timer = 0
+        self.damage_animation_speed = 100
+        self.damage_frame_index = 0
         
-        # Referência para grupo de projéteis (será definida externamente)
+        # Knockback
+        self.knockback_velocity = 0
+        self.knockback_timer = 0
+        self.knockback_duration = 300
+        
+        # Sons (definidos externamente)
+        self.damage_sound = None
+        self.death_sound = None
         self.projectiles = None
-        
-        # Som de disparo (será definido externamente)
         self.shoot_sound = None
 
     def _load_animations(self, sprite_sheet, animation_rects, buster_sheet, buster_rects):
@@ -61,6 +79,23 @@ class Player(pygame.sprite.Sprite):
         )
         self.shoot_right = scale_frames(shoot_frames, SPRITE_SCALE)
         self.shoot_left = flip_frames_horizontal(self.shoot_right)
+
+        # NOVO: Animação de dano (igual as outras)
+        if 'damage' in animation_rects:
+            damage_frames = slice_surface_padded(
+                sprite_sheet, animation_rects['damage'], pad=(0, 1, 0, 1)
+            )
+            damage_right = scale_frames(damage_frames, SPRITE_SCALE)
+            damage_left = flip_frames_horizontal(damage_right)
+            
+            self.damage_sprites = {
+                'right': damage_right,
+                'left': damage_left
+            }
+            print(f"[Player] Sprites de dano carregados: {len(damage_right)} frames")
+        else:
+            self.damage_sprites = {'right': [], 'left': []}
+            print("[Player] Sprites de dano não encontrados em animation_rects")
 
         # Projétil (do buster sheet)
         pellet_frames = slice_surface_padded(
@@ -154,6 +189,16 @@ class Player(pygame.sprite.Sprite):
 
     def handle_input(self, keys):
         """Processa entrada do jogador."""
+        # TESTE TEMPORÁRIO - Pressione T para testar animação de dano
+        if keys[pygame.K_t] and not self.keys_pressed.get('test_damage', False):
+            print("[TEST] Forçando animação de dano!")
+            self.is_taking_damage = True
+            self.damage_animation_timer = 0
+            self.damage_frame_index = 0
+            self.keys_pressed['test_damage'] = True
+        elif not keys[pygame.K_t]:
+            self.keys_pressed['test_damage'] = False
+        
         # Movimento horizontal (apenas setas direcionais)
         self.velocity_x = 0
         
@@ -231,10 +276,44 @@ class Player(pygame.sprite.Sprite):
 
     def animate(self, dt):
         """Atualiza animação do jogador."""
-        # Verifica se está se movendo (considera também dash)
+        # DEBUG FORÇADO
+        print(f"[DEBUG ANIMATE] is_taking_damage: {self.is_taking_damage}")
+        print(f"[DEBUG ANIMATE] damage_sprites disponíveis: {len(self.damage_sprites.get('right', []))}")
+        
+        # PRIORIDADE MÁXIMA: Animação de dano - COM DEBUG DETALHADO
+        if self.is_taking_damage:
+            print("[DEBUG ANIMATE] ENTROU na animação de dano!")
+            
+            if not self.damage_sprites:
+                print("[DEBUG ANIMATE] ERROR: damage_sprites é None/vazio")
+                return
+                
+            if 'right' not in self.damage_sprites:
+                print("[DEBUG ANIMATE] ERROR: 'right' não existe em damage_sprites")
+                return
+                
+            frames = self.damage_sprites['right'] if self.facing_direction == 1 else self.damage_sprites['left']
+            
+            if not frames:
+                print("[DEBUG ANIMATE] ERROR: lista de frames está vazia")
+                return
+                
+            if self.damage_frame_index >= len(frames):
+                print(f"[DEBUG ANIMATE] ERROR: damage_frame_index {self.damage_frame_index} >= {len(frames)}")
+                self.damage_frame_index = 0  # Corrige o índice
+                
+            current_frame = frames[self.damage_frame_index]
+            print(f"[DEBUG ANIMATE] Aplicando sprite de dano frame {self.damage_frame_index}, tamanho: {current_frame.get_size()}")
+            
+            set_image_keep_feet(self, current_frame)
+            return  # IMPORTANTE: Sair aqui para não executar outras animações
+        
+        print("[DEBUG ANIMATE] NÃO está tomando dano, usando animação normal")
+        
+        # Se chegou aqui, não está tomando dano
         is_moving = abs(self.velocity_x) > 0.1
 
-        # Animação de dash (prioridade máxima no chão)
+        # Animação de dash (prioridade alta no chão)
         if self.is_on_ground and self.dash_timer > 0:
             frames = self.dash_right if self.facing_direction == 1 else self.dash_left
             frame_index = 1 if self.dash_timer < DASH_TIME_MS * 0.6 else 0
@@ -248,7 +327,7 @@ class Player(pygame.sprite.Sprite):
 
         # Animação no chão (corrida/parado + pose de tiro)
         self._animate_ground(dt, is_moving)
-
+        
     def _animate_jump(self, dt):
         """Anima o jogador no ar."""
         frames = self.jump_right if self.facing_direction == 1 else self.jump_left
@@ -302,26 +381,55 @@ class Player(pygame.sprite.Sprite):
 
     def update(self, dt, keys):
         """Atualização principal do jogador."""
+        if not self.is_alive:
+            return
+            
         self.handle_input(keys)
         self.apply_physics(dt)
-        self.animate(dt)
+        self.update_knockback(dt)
+        self.update_damage_animation(dt)  # DEVE vir ANTES do animate()
+        self.animate(dt)  # animate() deve usar o estado atualizado
         self.update_damage_effects(dt)
 
     def take_damage(self, damage=2):
+        """Aplica dano ao jogador com knockback e efeitos visuais."""
         if self.invincibility_timer > 0 or not self.is_alive:
+            print("[DEBUG] take_damage ignorado (invencibilidade ou morto)")
             return False
         
+        print("[DEBUG] ============ TAKE_DAMAGE EXECUTADO ============")
+        
+        # Aplica o dano
         self.current_health -= damage
         self.invincibility_timer = self.invincibility_duration
-        self.damage_flash_timer = 200  # Flash de dano
+        self.damage_flash_timer = 200
         
-        print(f"[Player] Levou dano! Vida: {self.current_health}/{self.max_health}")
+        # FORÇAR animação de dano
+        self.is_taking_damage = True
+        self.damage_animation_timer = 0
+        self.damage_frame_index = 0
         
+        print(f"[DEBUG] Estado após take_damage:")
+        print(f"  is_taking_damage: {self.is_taking_damage}")
+        print(f"  damage_frame_index: {self.damage_frame_index}")
+        print(f"  damage_sprites['right']: {len(self.damage_sprites.get('right', []))} frames")
+        
+        # Knockback
+        knockback_force = -3.0 if self.facing_direction == 1 else 3.0
+        self.knockback_velocity = knockback_force
+        self.knockback_timer = self.knockback_duration
+        
+        # Som
+        if self.damage_sound:
+            self.damage_sound.play()
+        
+        # Morte
         if self.current_health <= 0:
             self.current_health = 0
             self.is_alive = False
-            print("[Player] Game Over!")
-            return True  # Indica que morreu
+            if self.death_sound:
+                self.death_sound.play()
+            return True
         
         return False
 
@@ -329,25 +437,6 @@ class Player(pygame.sprite.Sprite):
         """Atualiza efeitos visuais de dano."""
         if self.invincibility_timer > 0:
             self.invincibility_timer -= dt
-            
-            # Flash de dano
-            if self.damage_flash_timer > 0:
-                self.damage_flash_timer -= dt
-                # Pisca entre normal e avermelhado
-                if int(self.damage_flash_timer / 50) % 2 == 0:
-                    # Cria versão avermelhada da imagem
-                    if self.original_image is None:
-                        self.original_image = self.image.copy()
-                    
-                    red_surface = pygame.Surface(self.image.get_size())
-                    red_surface.fill((255, 100, 100))
-                    red_surface.set_alpha(100)
-                    
-                    temp_image = self.original_image.copy()
-                    temp_image.blit(red_surface, (0, 0), special_flags=pygame.BLEND_ADD)
-                    self.image = temp_image
-            else:
-                self.original_image = None
 
     def reset_health(self):
         """Reseta a vida do jogador."""
@@ -355,3 +444,55 @@ class Player(pygame.sprite.Sprite):
         self.is_alive = True
         self.invincibility_timer = 0
         self.damage_flash_timer = 0
+        
+        # NOVO: Reset dos efeitos de dano
+        self.is_taking_damage = False
+        self.damage_animation_timer = 0
+        self.damage_frame_index = 0
+        self.knockback_velocity = 0
+        self.knockback_timer = 0
+
+    def update_damage_animation(self, dt):
+        """Atualiza a animação de dano."""
+        if not self.is_taking_damage:
+            return
+        
+        print(f"[DEBUG UPDATE_DAMAGE] Atualizando animação: timer={self.damage_animation_timer}, speed={self.damage_animation_speed}")
+        
+        self.damage_animation_timer += dt
+        
+        # Avança para o próximo frame de dano
+        if self.damage_animation_timer >= self.damage_animation_speed:
+            self.damage_animation_timer = 0
+            self.damage_frame_index += 1
+            
+            print(f"[DEBUG UPDATE_DAMAGE] Avançando para frame {self.damage_frame_index}")
+            
+            # Se chegou ao fim da animação de dano
+            if self.damage_frame_index >= len(self.damage_sprites.get('right', [])):
+                self.is_taking_damage = False
+                self.damage_frame_index = 0
+                print("[DEBUG UPDATE_DAMAGE] Animação de dano FINALIZADA!")
+
+    def update_knockback(self, dt):
+        """Atualiza o efeito de knockback."""
+        if self.knockback_timer > 0:
+            self.knockback_timer -= dt
+            
+            # Aplica o knockback
+            self.world_x += self.knockback_velocity
+            
+            # Diminui gradualmente o knockback
+            self.knockback_velocity *= 0.9
+            
+            # Para o knockback quando o timer acabar
+            if self.knockback_timer <= 0:
+                self.knockback_velocity = 0
+
+    def force_damage_animation_test(self):
+        """Método temporário para testar animação de dano."""
+        print("[TEST] Forçando animação de dano...")
+        self.is_taking_damage = True
+        self.damage_animation_timer = 0
+        self.damage_frame_index = 0
+        print(f"[TEST] Estado após forçar: is_taking_damage={self.is_taking_damage}, frames disponíveis={len(self.damage_sprites.get('right', []))}")
