@@ -16,30 +16,44 @@ class GameRenderer:
         self.screen.fill(BACKGROUND_COLOR)
 
     def draw_background(self, background_img, camera_x):
-        """Desenha o background com efeito parallax."""
-        if background_img is None:
+        """Desenha o background com efeito parallax e repetição infinita."""
+        if not background_img:
             return
-            
+        
         bg_width = background_img.get_width()
         bg_height = background_img.get_height()
         
-        # Calcula a velocidade do parallax (background se move mais lento que a câmera)
-        parallax_speed = 0.5
-        bg_offset = int(camera_x * parallax_speed) % bg_width
+        # MODIFICADO: Sistema de repetição infinita
+        # Calcula quantas repetições são necessárias para cobrir a tela
+        parallax_speed = 0.3  # Background se move mais devagar que a câmera
+        bg_x_offset = (camera_x * parallax_speed) % bg_width
         
-        # Desenha o background repetindo horizontalmente
-        # Primeiro segmento
-        self.screen.blit(background_img, (-bg_offset, 0))
+        # Número de cópias necessárias para cobrir toda a tela
+        copies_needed = (WINDOW_WIDTH // bg_width) + 2  # +2 para garantir cobertura total
         
-        # Segundo segmento (para continuidade)
-        if bg_offset > 0:
-            self.screen.blit(background_img, (bg_width - bg_offset, 0))
-        
-        # Se a tela é maior que o background, desenha mais segmentos
-        x_pos = bg_width - bg_offset
-        while x_pos < WINDOW_WIDTH:
-            self.screen.blit(background_img, (x_pos, 0))
-            x_pos += bg_width
+        # Desenha múltiplas cópias do background
+        for i in range(copies_needed):
+            bg_x = (i * bg_width) - bg_x_offset
+            
+            # Posição Y para alinhar com o topo da tela
+            bg_y = 0
+            
+            # Se a imagem for muito alta, corta para mostrar só a parte de cima
+            if bg_height > WINDOW_HEIGHT:
+                # Cria uma versão cortada mostrando só a parte superior
+                cropped_bg = background_img.subsurface((0, 0, bg_width, WINDOW_HEIGHT))
+                self.screen.blit(cropped_bg, (bg_x, bg_y))
+            else:
+                # Se a imagem couber na tela, desenha normalmente
+                self.screen.blit(background_img, (bg_x, bg_y))
+                
+                # Se a imagem for menor que a altura da tela, pode repetir verticalmente também
+                if bg_height < WINDOW_HEIGHT:
+                    remaining_height = WINDOW_HEIGHT - bg_height
+                    y_copies = (remaining_height // bg_height) + 1
+                    
+                    for j in range(1, y_copies + 1):
+                        self.screen.blit(background_img, (bg_x, bg_y + (j * bg_height)))
 
     def draw_ground(self, camera_x):
         """Desenha a plataforma e o chão."""
