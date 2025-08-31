@@ -27,6 +27,25 @@ class Enemy(pygame.sprite.Sprite):
         self.shoot_cooldown = 2000
         self.can_shoot = False
         
+        # MODIFICADO: Sistema de tiro completamente aleatório
+        self.shot_heights = ["ground", "low", "mid", "high"]
+        
+        # ADICIONADO: Sistema de velocidades variadas
+        self.shot_speeds = {
+            "slow": 3.0,     # Velocidade mínima
+            "normal": 5.0,   # Velocidade normal (aumentada)
+            "fast": 7.0,     # Velocidade rápida (aumentada)
+            "very_fast": 9.0 # Velocidade muito rápida (aumentada)
+        }
+        
+        # MODIFICADO: Probabilidades ajustadas para mais ação
+        self.speed_probabilities = [
+            ("slow", 15),      # 15% chance de tiro lento (era 40%)
+            ("normal", 35),    # 35% chance de tiro normal
+            ("fast", 35),      # 35% chance de tiro rápido (era 20%)
+            ("very_fast", 15)  # 15% chance de tiro muito rápido (era 5%)
+        ]
+        
         self._load_animations()
         
         self.image = self.animation_frames[0] if self.animation_frames else pygame.Surface((32, 32))
@@ -35,7 +54,7 @@ class Enemy(pygame.sprite.Sprite):
         self.rect.bottom = self.world_y
         
         self.projectiles = None
-        
+
     def _load_animations(self):
         frame_rects = [
             (4, 1, 47, 61),    
@@ -91,6 +110,41 @@ class Enemy(pygame.sprite.Sprite):
                 self.can_shoot = True
                 self.shoot_timer = 0
 
+    def _get_random_shot_height(self):
+        """Retorna uma altura de tiro completamente aleatória."""
+        shot_type = random.choice(self.shot_heights)
+        
+        if shot_type == "ground":
+            # Tiro no nível do chão - player precisa pular
+            return GROUND_Y - 15
+        elif shot_type == "low":
+            # Tiro baixo - dash pode passar por baixo
+            return GROUND_Y - 35
+        elif shot_type == "mid":
+            # Tiro médio - pulo pequeno ou dash
+            return GROUND_Y - 55
+        elif shot_type == "high":
+            # Tiro alto - dash passa por baixo com folga
+            return GROUND_Y - 75
+        else:
+            # Fallback
+            return self.rect.centery
+
+    def _get_random_shot_speed(self):
+        """Retorna uma velocidade de tiro aleatória baseada nas probabilidades."""
+        # Gera um número aleatório de 0 a 100
+        rand_num = random.randint(1, 100)
+        
+        # Calcula as faixas baseadas nas probabilidades
+        cumulative = 0
+        for speed_type, probability in self.speed_probabilities:
+            cumulative += probability
+            if rand_num <= cumulative:
+                return self.shot_speeds[speed_type]
+        
+        # Fallback para velocidade lenta
+        return self.shot_speeds["slow"]
+
     def shoot_at_player(self, player_world_x, player_screen_y):
         if not self.can_shoot or not self.is_alive:
             return
@@ -98,9 +152,19 @@ class Enemy(pygame.sprite.Sprite):
         direction_x = 1 if player_world_x > self.world_x else -1
         
         projectile_world_x = self.world_x + (20 * SPRITE_SCALE * direction_x)
-        projectile_screen_y = self.rect.centery
         
-        projectile = EnemyProjectile(self.projectile_image, projectile_world_x, projectile_screen_y, direction_x)
+        # MODIFICADO: Altura e velocidade completamente aleatórias
+        projectile_screen_y = self._get_random_shot_height()
+        projectile_speed = self._get_random_shot_speed()
+        
+        # MODIFICADO: Cria projétil com velocidade personalizada
+        projectile = EnemyProjectile(
+            self.projectile_image, 
+            projectile_world_x, 
+            projectile_screen_y, 
+            direction_x,
+            speed=projectile_speed  # Passa a velocidade customizada
+        )
         
         if self.projectiles is not None:
             self.projectiles.add(projectile)
@@ -189,6 +253,7 @@ class EnemyManager:
             self.last_spawn_x += self.spawn_distance + random.randint(-200, 200)
         
         for enemy in self.enemies.sprites():
+            # REVERTIDO: Volta para player_screen_y
             enemy.update(dt, player_world_x, player_screen_y, camera_x)
             
             if enemy.world_x < player_world_x - 1000:

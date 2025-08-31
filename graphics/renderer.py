@@ -65,7 +65,6 @@ class GameRenderer:
 
     def draw_hud(self, distance, player=None):
         """Desenha a interface do usuário durante o jogo."""
-        # Controles
         controls_text = "←/→ correr | Z pular | X dash | A atirar | ESC pause"
         controls_surface = self.font.render(controls_text, True, UI_TEXT_COLOR)
         self.screen.blit(controls_surface, (16, 12))
@@ -79,19 +78,11 @@ class GameRenderer:
         if player:
             self._draw_health_bar(player)
 
-    def draw_player(self, player):
-        """Desenha o jogador."""
-        self.screen.blit(player.image, player.rect)
-
-    def draw_projectiles(self, projectiles):
-        """Desenha todos os projéteis."""
-        projectiles.draw(self.screen)
-
     def _draw_health_bar(self, player):
         """Desenha a barra de vida do jogador."""
-        # Posição da barra
+        # Posição da barra (ajustada para subir um pouco)
         bar_x = 16
-        bar_y = 45
+        bar_y = 35  # MODIFICADO: Era 45, agora 35 (subiu 10px)
         bar_width = 200
         bar_height = 20
         
@@ -122,3 +113,26 @@ class GameRenderer:
         health_text = f"LIFE: {player.current_health}/{player.max_health}"
         health_surface = pygame.font.SysFont('Arial', 16).render(health_text, True, UI_TEXT_COLOR)
         self.screen.blit(health_surface, (bar_x + bar_width + 10, bar_y + 2))
+
+    def draw_player(self, player):
+        """Desenha o jogador na tela."""
+        if player and player.is_alive:
+            self.screen.blit(player.image, player.rect)
+
+    def draw_sprites(self, sprite_group):
+        """Desenha um grupo de sprites na tela."""
+        for sprite in sprite_group:
+            if hasattr(sprite, 'rect') and hasattr(sprite, 'image'):
+                self.screen.blit(sprite.image, sprite.rect)
+
+    def draw_projectiles(self, projectile_group):
+        """Desenha projéteis na tela."""
+        self.draw_sprites(projectile_group)
+
+    def draw_enemies(self, enemy_group):
+        """Desenha inimigos na tela."""
+        self.draw_sprites(enemy_group)
+
+    def draw_enemy_projectiles(self, projectile_group):
+        """Desenha projéteis dos inimigos na tela."""
+        self.draw_sprites(projectile_group)

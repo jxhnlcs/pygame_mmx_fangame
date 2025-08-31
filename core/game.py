@@ -260,6 +260,7 @@ class Game:
         self.camera.update(self.player)
         self.projectiles.update(dt, self.camera.get_x())
         
+        # REVERTIDO: Volta para player.rect.centery
         self.enemy_manager.update(dt, self.player.world_x, self.player.rect.centery, 
                                  self.camera.get_x(), self.projectiles)
         

@@ -128,32 +128,6 @@ class Player(pygame.sprite.Sprite):
             'shoot': False
         }
 
-    def start_dash(self):
-        if self.is_on_ground and self.dash_timer <= 0:
-            self.dash_timer = DASH_TIME_MS
-            self.dash_velocity = DASH_SPEED * self.facing_direction
-
-    def shoot(self):
-        if self.shoot_cooldown > 0:
-            return
-            
-        if self.shoot_sound:
-            self.shoot_sound.play()
-        
-        self.shoot_timer = 150
-        self.shoot_cooldown = 150
-        
-        offset_x = 15 * SPRITE_SCALE
-        world_px = self.world_x + (offset_x if self.facing_direction == 1 else -offset_x)
-        
-        arm_height_offset = -2 * SPRITE_SCALE
-        screen_py = self.rect.centery + arm_height_offset
-        
-        pellet = Pellet(self.pellet_image, world_px, screen_py, self.facing_direction)
-        
-        if self.projectiles is not None:
-            self.projectiles.add(pellet)
-
     def handle_input(self, keys):
         if keys[pygame.K_t] and not self.keys_pressed.get('test_damage', False):
             self.is_taking_damage = True
@@ -196,33 +170,6 @@ class Player(pygame.sprite.Sprite):
             self.keys_pressed['shoot'] = True
         elif not keys[pygame.K_a]:
             self.keys_pressed['shoot'] = False
-
-    def apply_physics(self, dt):
-        self.world_x += self.velocity_x
-        if self.world_x < 0:
-            self.world_x = 0
-
-        self.velocity_y += GRAVITY
-        self.rect.y += int(self.velocity_y)
-
-        if self.rect.bottom >= GROUND_Y and self.velocity_y >= 0:
-            self.rect.bottom = GROUND_Y
-            self.velocity_y = 0
-            self.is_on_ground = True
-        else:
-            if self.rect.bottom < GROUND_Y:
-                self.is_on_ground = False
-
-        if self.dash_timer > 0:
-            self.dash_timer -= dt
-            if self.dash_timer <= 0:
-                self.dash_velocity = 0
-
-        if self.shoot_timer > 0:
-            self.shoot_timer -= dt
-
-        if self.shoot_cooldown > 0:
-            self.shoot_cooldown -= dt
 
     def animate(self, dt):
         if self.is_taking_damage:
@@ -302,7 +249,73 @@ class Player(pygame.sprite.Sprite):
 
         set_image_keep_feet(self, image)
 
+    def start_dash(self):
+        """Inicia o dash se as condições forem atendidas."""
+        if self.is_on_ground and self.dash_timer <= 0:
+            self.dash_timer = DASH_TIME_MS
+            self.dash_velocity = DASH_SPEED * self.facing_direction
+
+    def shoot(self):
+        """Cria um projétil quando o jogador atira."""
+        if self.shoot_cooldown > 0:
+            return
+            
+        if self.shoot_sound:
+            self.shoot_sound.play()
+        
+        self.shoot_timer = 150
+        self.shoot_cooldown = 150
+        
+        # Offset horizontal para que o projétil saia da frente do jogador
+        offset_x = 15 * SPRITE_SCALE
+        world_px = self.world_x + (offset_x if self.facing_direction == 1 else -offset_x)
+        
+        # Altura do projétil (na altura do braço do jogador)
+        arm_height_offset = -2 * SPRITE_SCALE
+        screen_py = self.rect.centery + arm_height_offset
+        
+        # Cria o projétil
+        pellet = Pellet(self.pellet_image, world_px, screen_py, self.facing_direction)
+        
+        # Adiciona ao grupo de projéteis
+        if self.projectiles is not None:
+            self.projectiles.add(pellet)
+
+    def apply_physics(self, dt):
+        """Aplica física de movimento e gravidade ao jogador."""
+        # Movimento horizontal
+        self.world_x += self.velocity_x
+        if self.world_x < 0:
+            self.world_x = 0
+
+        # Gravidade e movimento vertical
+        self.velocity_y += GRAVITY
+        self.rect.y += int(self.velocity_y)
+
+        # Colisão com o chão
+        if self.rect.bottom >= GROUND_Y and self.velocity_y >= 0:
+            self.rect.bottom = GROUND_Y
+            self.velocity_y = 0
+            self.is_on_ground = True
+        else:
+            if self.rect.bottom < GROUND_Y:
+                self.is_on_ground = False
+
+        # Atualiza timers de dash
+        if self.dash_timer > 0:
+            self.dash_timer -= dt
+            if self.dash_timer <= 0:
+                self.dash_velocity = 0
+
+        # Atualiza timers de tiro
+        if self.shoot_timer > 0:
+            self.shoot_timer -= dt
+
+        if self.shoot_cooldown > 0:
+            self.shoot_cooldown -= dt
+
     def update(self, dt, keys):
+        """Atualiza o jogador a cada frame."""
         if not self.is_alive:
             return
             
