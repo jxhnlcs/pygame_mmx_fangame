@@ -127,6 +127,52 @@ class GameRenderer:
         health_text = f"LIFE: {player.current_health}/{player.max_health}"
         health_surface = pygame.font.SysFont('Arial', 16).render(health_text, True, UI_TEXT_COLOR)
         self.screen.blit(health_surface, (bar_x + bar_width + 10, bar_y + 2))
+        
+        # ADICIONADO: Indicadores de power-ups ativos
+        self._draw_powerup_indicators(player, bar_x, bar_y + 30)
+    
+    def _draw_powerup_indicators(self, player, x, y):
+        """Desenha indicadores dos power-ups ativos."""
+        indicator_width = 60
+        indicator_height = 15
+        spacing = 5
+        current_x = x
+        
+        # Indicador de tiro rápido
+        if player.rapid_fire_timer > 0:
+            # Barra de progresso do tiro rápido
+            progress = player.rapid_fire_timer / 10000  # 10 segundos total
+            fill_width = int(indicator_width * progress)
+            
+            pygame.draw.rect(self.screen, (100, 100, 255), 
+                           (current_x, y, indicator_width, indicator_height))
+            pygame.draw.rect(self.screen, (200, 200, 255), 
+                           (current_x, y, fill_width, indicator_height))
+            
+            text = pygame.font.SysFont('Arial', 12).render("DISPAROS RÁPIDOS", True, (255, 255, 255))
+            self.screen.blit(text, (current_x + 2, y + 1))
+            
+            current_x += indicator_width + spacing
+        
+        # Indicador de escudo
+        if player.has_shield:
+            # Barra de progresso do escudo
+            progress = player.shield_timer / 15000  # 15 segundos total
+            fill_width = int(indicator_width * progress)
+            
+            # Efeito de piscar quando está acabando
+            shield_color = (255, 255, 100)
+            if player.shield_timer < 3000:  # Últimos 3 segundos
+                if int(player.shield_flash_timer / 100) % 2:
+                    shield_color = (255, 200, 100)
+            
+            pygame.draw.rect(self.screen, shield_color, 
+                           (current_x, y, indicator_width, indicator_height))
+            pygame.draw.rect(self.screen, (255, 255, 200), 
+                           (current_x, y, fill_width, indicator_height))
+            
+            text = pygame.font.SysFont('Arial', 12).render("ESCUDO", True, (0, 0, 0))
+            self.screen.blit(text, (current_x + 2, y + 1))
 
     def draw_player(self, player):
         """Desenha o jogador na tela."""

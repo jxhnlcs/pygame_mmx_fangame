@@ -8,7 +8,7 @@ from graphics.camera import Camera
 from graphics.renderer import GameRenderer
 from core.game_states import StateManager, GameState, MenuScreen, PauseScreen, GameOverScreen
 from entities.enemies import EnemyManager
-
+from entities.powerups import PowerUpManager
 
 class Game:
     
@@ -37,10 +37,12 @@ class Game:
         self.player = None
         self.projectiles = None
         self.enemy_manager = None
+        self.powerup_manager = None  # ADICIONADO
         self.sprite_sheet = None
         self.buster_sheet = None
         self.enemy_sheet = None
         self.enemy_projectile_image = None
+        self.powerup_sprite_sheet = None  # ADICIONADO
         self.background = None
         self.shoot_sound = None
 
@@ -53,6 +55,8 @@ class Game:
             self._setup_audio()
             
             self.enemy_manager = EnemyManager(self.enemy_sheet, self.enemy_projectile_image)
+            # ADICIONADO: Inicializa manager de power-ups
+            self.powerup_manager = PowerUpManager(self.powerup_sprite_sheet)
 
     def _load_assets(self):
         sheet_path = Path(__file__).parent.parent / "assets" / "spritesheets" / "mmx_xsheet.png"
@@ -61,6 +65,14 @@ class Game:
         
         buster_path = Path(__file__).parent.parent / "assets" / "spritesheets" / "mmx1-buster.png"
         self.buster_sheet = pygame.image.load(str(buster_path)).convert_alpha()
+        
+        # ADICIONADO: Carrega sprite sheet dos power-ups
+        powerup_path = Path(__file__).parent.parent / "assets" / "spritesheets" / "mmx1_items.png"
+        try:
+            self.powerup_sprite_sheet = pygame.image.load(str(powerup_path)).convert_alpha()
+        except:
+            # Se não encontrar, cria sprites temporários
+            self.powerup_sprite_sheet = self._create_temp_powerup_sprites()
         
         self._load_enemy_assets()
         self._load_sound_effects()
@@ -203,6 +215,10 @@ class Game:
             
         if self.enemy_manager:
             self.enemy_manager = EnemyManager(self.enemy_sheet, self.enemy_projectile_image)
+        
+        # ADICIONADO: Reset do manager de power-ups
+        if self.powerup_manager:
+            self.powerup_manager = PowerUpManager(self.powerup_sprite_sheet)
 
     def _update_input_detection(self):
         current_keys = pygame.key.get_pressed()
@@ -260,9 +276,14 @@ class Game:
         self.camera.update(self.player)
         self.projectiles.update(dt, self.camera.get_x())
         
-        # REVERTIDO: Volta para player.rect.centery
         self.enemy_manager.update(dt, self.player.world_x, self.player.rect.centery, 
                                  self.camera.get_x(), self.projectiles)
+        
+        # ADICIONADO: Atualiza power-ups
+        self.powerup_manager.update(dt, self.player.world_x, self.camera.get_x())
+        
+        # ADICIONADO: Verifica colisões com power-ups
+        powerup_messages = self.powerup_manager.check_player_collision(self.player)
         
         self.distance = self.player.world_x
         self.total_time = pygame.time.get_ticks() - self.start_time
@@ -316,6 +337,9 @@ class Game:
             self.renderer.draw_ground(self.camera.get_x())
             
             self.enemy_manager.render(self.screen, self.camera.get_x())
+            
+            # ADICIONADO: Desenha power-ups
+            self.powerup_manager.draw(self.screen)
             
             self.renderer.draw_player(self.player)
             self.renderer.draw_projectiles(self.projectiles)

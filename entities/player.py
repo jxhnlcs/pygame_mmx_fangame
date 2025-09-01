@@ -27,6 +27,13 @@ class Player(pygame.sprite.Sprite):
         self.damage_flash_timer = 0
         self.original_image = None
 
+        # ADICIONADO: Power-ups
+        self.has_shield = False
+        self.shield_timer = 0
+        self.rapid_fire_timer = 0
+        self.normal_shoot_cooldown = 150
+        self.rapid_shoot_cooldown = 50  # Tiro mais rápido
+
         self.is_taking_damage = False
         self.damage_animation_timer = 0
         self.damage_animation_speed = 100
@@ -35,6 +42,9 @@ class Player(pygame.sprite.Sprite):
         self.knockback_velocity = 0
         self.knockback_timer = 0
         self.knockback_duration = 300
+        
+        # Efeitos visuais
+        self.shield_flash_timer = 0
         
         self.damage_sound = None
         self.death_sound = None
@@ -255,8 +265,24 @@ class Player(pygame.sprite.Sprite):
             self.dash_timer = DASH_TIME_MS
             self.dash_velocity = DASH_SPEED * self.facing_direction
 
+    def heal(self, amount):
+        """Cura o jogador em uma quantidade específica."""
+        self.current_health = min(self.current_health + amount, self.max_health)
+    
+    def activate_rapid_fire(self, duration_ms):
+        """Ativa tiro rápido por um tempo determinado."""
+        self.rapid_fire_timer = duration_ms
+    
+    def activate_shield(self, duration_ms):
+        """Ativa escudo por um tempo determinado."""
+        self.has_shield = True
+        self.shield_timer = duration_ms
+
     def shoot(self):
         """Cria um projétil quando o jogador atira."""
+        # Usa cooldown baseado no power-up
+        current_cooldown = self.rapid_shoot_cooldown if self.rapid_fire_timer > 0 else self.normal_shoot_cooldown
+        
         if self.shoot_cooldown > 0:
             return
             
@@ -264,7 +290,7 @@ class Player(pygame.sprite.Sprite):
             self.shoot_sound.play()
         
         self.shoot_timer = 150
-        self.shoot_cooldown = 150
+        self.shoot_cooldown = current_cooldown  # MODIFICADO: Usa cooldown variável
         
         # Offset horizontal para que o projétil saia da frente do jogador
         offset_x = 15 * SPRITE_SCALE
@@ -318,15 +344,117 @@ class Player(pygame.sprite.Sprite):
         """Atualiza o jogador a cada frame."""
         if not self.is_alive:
             return
-            
+        
+        # ADICIONADO: Atualiza timers de power-ups
+        self._update_powerup_timers(dt)
+        
         self.handle_input(keys)
         self.apply_physics(dt)
         self.update_knockback(dt)
         self.update_damage_animation(dt)
         self.animate(dt)
         self.update_damage_effects(dt)
+    
+    def _update_powerup_timers(self, dt):
+        """Atualiza os timers dos power-ups."""
+        # Timer de tiro rápido
+        if self.rapid_fire_timer > 0:
+            self.rapid_fire_timer -= dt
+            if self.rapid_fire_timer <= 0:
+                self.rapid_fire_timer = 0
+        
+        # Timer de escudo
+        if self.shield_timer > 0:
+            self.shield_timer -= dt
+            self.shield_flash_timer += dt
+            if self.shield_timer <= 0:
+                self.shield_timer = 0
+                self.has_shield = False
+                self.shield_flash_timer = 0
+
+    def update_damage_effects(self, dt):
+        """Atualiza efeitos visuais de dano e invulnerabilidade."""
+        # Atualiza timer de invulnerabilidade
+        if self.invincibility_timer > 0:
+            self.invincibility_timer -= dt
+            if self.invincibility_timer <= 0:
+                self.invincibility_timer = 0
+        
+        # Atualiza efeito de flash de dano
+        if self.damage_flash_timer > 0:
+            self.damage_flash_timer -= dt
+            if self.damage_flash_timer <= 0:
+                self.damage_flash_timer = 0
+        
+        # Efeito visual durante invulnerabilidade (piscar)
+        if self.invincibility_timer > 0:
+            # Faz o sprite piscar durante a invulnerabilidade
+            flash_rate = 100  # Velocidade do piscar em ms
+            if int(self.invincibility_timer / flash_rate) % 2:
+                # Torna o sprite semi-transparente
+                if hasattr(self, 'original_image') and self.original_image:
+                    temp_image = self.original_image.copy()
+                    temp_image.set_alpha(128)  # 50% transparente
+                    self.image = temp_image
+                else:
+                    # Backup: usa a imagem atual
+                    temp_image = self.image.copy()
+                    temp_image.set_alpha(128)
+                    self.image = temp_image
+            else:
+                # Restaura opacidade normal
+                if hasattr(self, 'original_image') and self.original_image:
+                    self.image = self.original_image.copy()
+                else:
+                    # Restaura alpha normal
+                    self.image.set_alpha(255)
+        else:
+            # Garante que o sprite esteja com opacidade normal
+            if hasattr(self, 'original_image') and self.original_image:
+                self.image = self.original_image.copy()
+            else:
+                self.image.set_alpha(255)
+
+    def update_knockback(self, dt):
+        """Atualiza o efeito de knockback quando o jogador toma dano."""
+        if self.knockback_timer > 0:
+            self.knockback_timer -= dt
+            
+            # Aplica velocidade de knockback
+            self.world_x += self.knockback_velocity * (dt / 16.67)  # Normaliza para 60 FPS
+            
+            # Reduz gradualmente a velocidade de knockback
+            decay_factor = 0.95
+            self.knockback_velocity *= decay_factor
+            
+            # Para o knockback quando o timer acaba
+            if self.knockback_timer <= 0:
+                self.knockback_timer = 0
+                self.knockback_velocity = 0
+
+    def update_damage_animation(self, dt):
+        """Atualiza a animação de dano do jogador."""
+        if self.is_taking_damage and len(self.damage_sprites['right']) > 0:
+            self.damage_animation_timer += dt
+            
+            if self.damage_animation_timer >= self.damage_animation_speed:
+                self.damage_animation_timer = 0
+                self.damage_frame_index += 1
+                
+                # Verifica se a animação de dano terminou
+                direction_key = 'right' if self.facing_direction == 1 else 'left'
+                if self.damage_frame_index >= len(self.damage_sprites[direction_key]):
+                    self.damage_frame_index = 0
+                    self.is_taking_damage = False
+                else:
+                    # Atualiza o sprite para o frame de dano atual
+                    self.image = self.damage_sprites[direction_key][self.damage_frame_index]
 
     def take_damage(self, damage=2):
+        # Se tem escudo, não toma dano
+        if self.has_shield:
+            return False
+        
         if self.invincibility_timer > 0 or not self.is_alive:
             return False
         
@@ -354,48 +482,45 @@ class Player(pygame.sprite.Sprite):
         
         return False
 
-    def update_damage_effects(self, dt):
-        if self.invincibility_timer > 0:
-            self.invincibility_timer -= dt
-
     def reset_health(self):
+        """Reseta a vida e estado do jogador para uma nova partida."""
         self.current_health = self.max_health
         self.is_alive = True
         self.invincibility_timer = 0
         self.damage_flash_timer = 0
+        self.original_image = None
         
+        # ADICIONADO: Reset dos power-ups
+        self.has_shield = False
+        self.shield_timer = 0
+        self.rapid_fire_timer = 0
+        self.shield_flash_timer = 0
+        
+        # Reset de estado de dano
         self.is_taking_damage = False
         self.damage_animation_timer = 0
         self.damage_frame_index = 0
+        
+        # Reset de knockback
         self.knockback_velocity = 0
         self.knockback_timer = 0
-
-    def update_damage_animation(self, dt):
-        if not self.is_taking_damage:
-            return
         
-        self.damage_animation_timer += dt
+        # Reset de timers de ação
+        self.dash_timer = 0
+        self.dash_velocity = 0
+        self.shoot_timer = 0
+        self.shoot_cooldown = 0
         
-        if self.damage_animation_timer >= self.damage_animation_speed:
-            self.damage_animation_timer = 0
-            self.damage_frame_index += 1
-            
-            if self.damage_frame_index >= len(self.damage_sprites.get('right', [])):
-                self.is_taking_damage = False
-                self.damage_frame_index = 0
-
-    def update_knockback(self, dt):
-        if self.knockback_timer > 0:
-            self.knockback_timer -= dt
-            
-            self.world_x += self.knockback_velocity
-            
-            self.knockback_velocity *= 0.9
-            
-            if self.knockback_timer <= 0:
-                self.knockback_velocity = 0
+        # Reset de estado de input
+        self.keys_pressed = {
+            'dash': False,
+            'jump': False,
+            'shoot': False,
+            'test_damage': False
+        }
 
     def force_damage_animation_test(self):
+        """Força a animação de dano para teste."""
         self.is_taking_damage = True
         self.damage_animation_timer = 0
         self.damage_frame_index = 0
