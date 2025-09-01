@@ -109,9 +109,11 @@ class PowerUp(pygame.sprite.Sprite):
 
 class PowerUpManager:
     
-    def __init__(self, sprite_sheet):
+    def __init__(self, sprite_sheet, powerup_sounds=None):
         self.powerups = pygame.sprite.Group()
         self.sprite_sheet = sprite_sheet
+        # ADICIONADO: Sons dos power-ups
+        self.powerup_sounds = powerup_sounds if powerup_sounds else {}
         
         # Controle de spawn
         self.spawn_distance = 800  # Distância entre power-ups
@@ -168,9 +170,27 @@ class PowerUpManager:
         for powerup in collected_powerups:
             message = powerup.apply_effect(player)
             messages.append(message)
+            
+            # ADICIONADO: Toca som baseado no tipo do power-up
+            self._play_powerup_sound(powerup.powerup_type)
         
         return messages
     
+    def _play_powerup_sound(self, powerup_type):
+        """Toca o som apropriado para o tipo de power-up coletado."""
+        sound_mapping = {
+            PowerUpType.HEALTH: 'health',
+            PowerUpType.RAPID_FIRE: 'rapid_fire', 
+            PowerUpType.SHIELD: 'shield'
+        }
+        
+        sound_key = sound_mapping.get(powerup_type)
+        if sound_key and sound_key in self.powerup_sounds:
+            try:
+                self.powerup_sounds[sound_key].play()
+            except Exception as e:
+                print(f"Erro ao tocar som do power-up {sound_key}: {e}")
+
     def draw(self, screen):
         """Desenha todos os power-ups."""
         for powerup in self.powerups.sprites():

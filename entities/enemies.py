@@ -6,12 +6,16 @@ from entities.projectile import EnemyProjectile
 
 class Enemy(pygame.sprite.Sprite):
     
-    def __init__(self, world_x, sprite_sheet, projectile_image):
+    def __init__(self, world_x, sprite_sheet, projectile_image, shoot_sound=None, death_sound=None):
         super().__init__()
         self.world_x = world_x
         self.world_y = GROUND_Y
         self.sprite_sheet = sprite_sheet
         self.projectile_image = projectile_image
+        
+        # ADICIONADO: Sons do inimigo
+        self.shoot_sound = shoot_sound
+        self.death_sound = death_sound
         
         self.health = 10
         self.max_health = 10
@@ -149,6 +153,13 @@ class Enemy(pygame.sprite.Sprite):
         if not self.can_shoot or not self.is_alive:
             return
         
+        # ADICIONADO: Toca som de disparo
+        if self.shoot_sound:
+            try:
+                self.shoot_sound.play()
+            except Exception as e:
+                print(f"Erro ao tocar som de disparo do inimigo: {e}")
+        
         direction_x = 1 if player_world_x > self.world_x else -1
         
         projectile_world_x = self.world_x + (20 * SPRITE_SCALE * direction_x)
@@ -179,6 +190,14 @@ class Enemy(pygame.sprite.Sprite):
         
         if self.health <= 0:
             self.is_alive = False
+            
+            # ADICIONADO: Toca som de morte
+            if self.death_sound:
+                try:
+                    self.death_sound.play()
+                except Exception as e:
+                    print(f"Erro ao tocar som de morte do inimigo: {e}")
+            
             return True
         
         return False
@@ -233,17 +252,28 @@ class Enemy(pygame.sprite.Sprite):
 
 class EnemyManager:
     
-    def __init__(self, sprite_sheet, projectile_image):
+    def __init__(self, sprite_sheet, projectile_image, shoot_sound=None, death_sound=None):
         self.enemies = pygame.sprite.Group()
         self.enemy_projectiles = pygame.sprite.Group()
         self.sprite_sheet = sprite_sheet
         self.projectile_image = projectile_image
         
+        # ADICIONADO: Sons para inimigos
+        self.shoot_sound = shoot_sound
+        self.death_sound = death_sound
+        
         self.spawn_distance = 600
         self.last_spawn_x = 800
         
     def spawn_enemy(self, world_x):
-        enemy = Enemy(world_x, self.sprite_sheet, self.projectile_image)
+        # MODIFICADO: Passa sons para o inimigo
+        enemy = Enemy(
+            world_x, 
+            self.sprite_sheet, 
+            self.projectile_image,
+            shoot_sound=self.shoot_sound,
+            death_sound=self.death_sound
+        )
         enemy.projectiles = self.enemy_projectiles
         self.enemies.add(enemy)
     
@@ -288,3 +318,30 @@ class EnemyManager:
                 enemy.render(screen)
         
         self.enemy_projectiles.draw(screen)
+    
+    def _create_temp_powerup_sprites(self):
+        """Cria sprites temporários para os power-ups."""
+        sprite_sheet = pygame.Surface((96, 32))
+        sprite_sheet.set_colorkey(MAGENTA_COLORKEY)
+        sprite_sheet.fill(MAGENTA_COLORKEY)
+        
+        # Power-up de vida (vermelho)
+        pygame.draw.rect(sprite_sheet, (255, 100, 100), (0, 0, 32, 32))
+        pygame.draw.rect(sprite_sheet, (255, 255, 255), (0, 0, 32, 32), 2)
+        # Adiciona símbolo de cruz para vida
+        pygame.draw.rect(sprite_sheet, (255, 255, 255), (14, 8, 4, 16))  # Vertical
+        pygame.draw.rect(sprite_sheet, (255, 255, 255), (8, 14, 16, 4))  # Horizontal
+        
+        # Power-up de tiro rápido (azul)
+        pygame.draw.rect(sprite_sheet, (100, 100, 255), (32, 0, 32, 32))
+        pygame.draw.rect(sprite_sheet, (255, 255, 255), (32, 0, 32, 32), 2)
+        # Adiciona símbolo de projétil
+        pygame.draw.circle(sprite_sheet, (255, 255, 255), (48, 16), 6)
+        
+        # Power-up de escudo (amarelo)
+        pygame.draw.rect(sprite_sheet, (255, 255, 100), (64, 0, 32, 32))
+        pygame.draw.rect(sprite_sheet, (255, 255, 255), (64, 0, 32, 32), 2)
+        # Adiciona símbolo de escudo
+        pygame.draw.circle(sprite_sheet, (255, 255, 255), (80, 16), 8, 3)
+        
+        return sprite_sheet

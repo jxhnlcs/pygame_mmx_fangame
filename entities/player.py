@@ -277,6 +277,17 @@ class Player(pygame.sprite.Sprite):
         """Ativa escudo por um tempo determinado."""
         self.has_shield = True
         self.shield_timer = duration_ms
+        self.shield_flash_timer = 0  # Reset do flash timer
+    
+    def remove_shield(self):
+        """Remove o escudo imediatamente."""
+        self.has_shield = False
+        self.shield_timer = 0
+        self.shield_flash_timer = 0
+        
+        # OPCIONAL: Efeito sonoro ao escudo quebrar (se você quiser adicionar)
+        # if self.shield_break_sound:
+        #     self.shield_break_sound.play()
 
     def shoot(self):
         """Cria um projétil quando o jogador atira."""
@@ -363,14 +374,14 @@ class Player(pygame.sprite.Sprite):
             if self.rapid_fire_timer <= 0:
                 self.rapid_fire_timer = 0
         
-        # Timer de escudo
-        if self.shield_timer > 0:
+        # Timer de escudo - MODIFICADO: Só expira por tempo se ainda estiver ativo
+        if self.has_shield and self.shield_timer > 0:
             self.shield_timer -= dt
             self.shield_flash_timer += dt
+            
+            # Escudo expira por tempo
             if self.shield_timer <= 0:
-                self.shield_timer = 0
-                self.has_shield = False
-                self.shield_flash_timer = 0
+                self.remove_shield()
 
     def update_damage_effects(self, dt):
         """Atualiza efeitos visuais de dano e invulnerabilidade."""
@@ -451,9 +462,10 @@ class Player(pygame.sprite.Sprite):
                     self.image = self.damage_sprites[direction_key][self.damage_frame_index]
 
     def take_damage(self, damage=2):
-        # Se tem escudo, não toma dano
+        # Se tem escudo, remove o escudo mas não toma dano
         if self.has_shield:
-            return False
+            self.remove_shield()  # MODIFICADO: Remove escudo imediatamente
+            return False  # Não toma dano, mas o escudo foi consumido
         
         if self.invincibility_timer > 0 or not self.is_alive:
             return False

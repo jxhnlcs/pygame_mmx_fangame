@@ -54,9 +54,19 @@ class Game:
             self._create_entities()
             self._setup_audio()
             
-            self.enemy_manager = EnemyManager(self.enemy_sheet, self.enemy_projectile_image)
-            # ADICIONADO: Inicializa manager de power-ups
-            self.powerup_manager = PowerUpManager(self.powerup_sprite_sheet)
+            # MODIFICADO: Passa os sons para o enemy manager
+            self.enemy_manager = EnemyManager(
+                self.enemy_sheet, 
+                self.enemy_projectile_image,
+                shoot_sound=getattr(self, 'shoot_sound', None),
+                death_sound=getattr(self, 'enemy_death_sound', None)
+            )
+            
+            # MODIFICADO: Passa os sons dos power-ups
+            self.powerup_manager = PowerUpManager(
+                self.powerup_sprite_sheet,
+                powerup_sounds=getattr(self, 'powerup_sounds', {})
+            )
 
     def _load_assets(self):
         sheet_path = Path(__file__).parent.parent / "assets" / "spritesheets" / "mmx_xsheet.png"
@@ -129,6 +139,7 @@ class Game:
             
             sound_effects_path = Path(__file__).parent.parent / "assets" / "sound-effects"
             
+            # Sons de tiro
             shoot_sound_path = sound_effects_path / "shoots"
             sound_files = list(shoot_sound_path.glob("*.wav")) + list(shoot_sound_path.glob("*.mp3"))
             
@@ -137,6 +148,7 @@ class Game:
             else:
                 self.shoot_sound = None
             
+            # Sons de dano
             damage_sound_path = sound_effects_path / "damage"
             damage_sound_files = list(damage_sound_path.glob("hurt*.wav")) + list(damage_sound_path.glob("hurt*.mp3"))
             if damage_sound_files:
@@ -149,11 +161,39 @@ class Game:
                 self.death_sound = pygame.mixer.Sound(str(death_sound_files[0]))
             else:
                 self.death_sound = None
+            
+            # ADICIONADO: Sons de power-ups
+            self.powerup_sounds = {}
+            
+            # Som de vida (lifegain.wav)
+            life_sound_files = list(sound_effects_path.glob("lifegain*.wav")) + list(sound_effects_path.glob("lifegain*.mp3"))
+            if life_sound_files:
+                self.powerup_sounds['health'] = pygame.mixer.Sound(str(life_sound_files[0]))
+            
+            # Som de tiro rápido (atirarrapido.wav)
+            rapid_sound_files = list(sound_effects_path.glob("atirarrapido*.wav")) + list(sound_effects_path.glob("atirarrapido*.mp3"))
+            if rapid_sound_files:
+                self.powerup_sounds['rapid_fire'] = pygame.mixer.Sound(str(rapid_sound_files[0]))
+            
+            # Som de escudo (escudo.wav)
+            shield_sound_files = list(sound_effects_path.glob("escudo*.wav")) + list(sound_effects_path.glob("escudo*.mp3"))
+            if shield_sound_files:
+                self.powerup_sounds['shield'] = pygame.mixer.Sound(str(shield_sound_files[0]))
+            
+            # ADICIONADO: Som de inimigo morrendo (inimigomorrendo.wav)
+            enemy_death_files = list(sound_effects_path.glob("inimigomorrendo*.wav")) + list(sound_effects_path.glob("inimigomorrendo*.mp3"))
+            if enemy_death_files:
+                self.enemy_death_sound = pygame.mixer.Sound(str(enemy_death_files[0]))
+            else:
+                self.enemy_death_sound = None
                 
         except Exception as e:
+            print(f"Erro ao carregar efeitos sonoros: {e}")
             self.shoot_sound = None
             self.damage_sound = None
             self.death_sound = None
+            self.powerup_sounds = {}
+            self.enemy_death_sound = None
 
     def _create_entities(self):
         animation_rects = {
@@ -213,12 +253,20 @@ class Game:
         if self.projectiles:
             self.projectiles.empty()
             
-        if self.enemy_manager:
-            self.enemy_manager = EnemyManager(self.enemy_sheet, self.enemy_projectile_image)
+        # MODIFICADO: Recria managers com sons
+        if hasattr(self, 'enemy_sheet'):
+            self.enemy_manager = EnemyManager(
+                self.enemy_sheet, 
+                self.enemy_projectile_image,
+                shoot_sound=getattr(self, 'shoot_sound', None),
+                death_sound=getattr(self, 'enemy_death_sound', None)
+            )
         
-        # ADICIONADO: Reset do manager de power-ups
-        if self.powerup_manager:
-            self.powerup_manager = PowerUpManager(self.powerup_sprite_sheet)
+        if hasattr(self, 'powerup_sprite_sheet'):
+            self.powerup_manager = PowerUpManager(
+                self.powerup_sprite_sheet,
+                powerup_sounds=getattr(self, 'powerup_sounds', {})
+            )
 
     def _update_input_detection(self):
         current_keys = pygame.key.get_pressed()
