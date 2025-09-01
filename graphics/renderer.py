@@ -17,47 +17,40 @@ class GameRenderer:
         self.screen.fill(BACKGROUND_COLOR)
 
     def draw_background(self, background_img, camera_x):
-        """Desenha o background com efeito parallax e repetição infinita."""
+        """Desenha o background com efeito parallax e repetição infinita focado nas árvores."""
         if not background_img:
             return
         
         bg_width = background_img.get_width()
         bg_height = background_img.get_height()
         
-        # MODIFICADO: Sistema de repetição infinita com offset inicial
-        parallax_speed = 0.3  # Background se move mais devagar que a câmera
+        # MODIFICADO: Pega a imagem inteira das árvores
+        tree_area_x = 0
+        tree_area_y = 0
+        tree_area_width = min(bg_width, 800)  # Largura da seção das árvores (ajuste conforme necessário)
+        tree_area_height = min(bg_height, 820)  # Altura até onde terminam as árvores (ajuste conforme necessário)
         
-        # ADICIONADO: Offset inicial para começar a imagem mais à direita
-        initial_offset = bg_width * 0.7  # Começa a imagem 70% deslocada para a direita
-        bg_x_offset = ((camera_x * parallax_speed) + initial_offset) % bg_width
-        
-        # Número de cópias necessárias para cobrir toda a tela
-        copies_needed = (WINDOW_WIDTH // bg_width) + 2  # +2 para garantir cobertura total
-        
-        # Desenha múltiplas cópias do background
+        try:
+            # Usa a imagem completa
+            tree_section = background_img
+        except:
+            tree_section = background_img
+    
+        # Sistema de repetição infinita com parallax
+        parallax_speed = 0.3
+        bg_x_offset = (camera_x * parallax_speed) % tree_area_width
+    
+        # MODIFICADO: Garante sobreposição sem gaps
+        copies_needed = (WINDOW_WIDTH // tree_area_width) + 3  # +3 para garantir cobertura total
+    
+        # Desenha múltiplas cópias SEM GAPS
         for i in range(copies_needed):
-            bg_x = (i * bg_width) - bg_x_offset
-            
-            # Posição Y para alinhar com o topo da tela
+            bg_x = (i * tree_area_width) - bg_x_offset
             bg_y = 0
             
-            # Se a imagem for muito alta, corta para mostrar só a parte de cima
-            if bg_height > WINDOW_HEIGHT:
-                # Cria uma versão cortada mostrando só a parte superior
-                cropped_bg = background_img.subsurface((0, 0, bg_width, WINDOW_HEIGHT))
-                self.screen.blit(cropped_bg, (bg_x, bg_y))
-            else:
-                # Se a imagem couber na tela, desenha normalmente
-                self.screen.blit(background_img, (bg_x, bg_y))
-                
-                # Se a imagem for menor que a altura da tela, pode repetir verticalmente também
-                if bg_height < WINDOW_HEIGHT:
-                    remaining_height = WINDOW_HEIGHT - bg_height
-                    y_copies = (remaining_height // bg_height) + 1
-                    
-                    for j in range(1, y_copies + 1):
-                        self.screen.blit(background_img, (bg_x, bg_y + (j * bg_height)))
-
+            # CORRIGIDO: Desenha a seção das árvores sem deixar gaps
+            self.screen.blit(tree_section, (int(bg_x), int(bg_y)))
+            
     def draw_ground(self, camera_x):
         """Desenha a plataforma e o chão."""
         # Plataforma principal
